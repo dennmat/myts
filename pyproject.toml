@@ -1,0 +1,29 @@
+[tool.poetry]
+name = "myts"
+version = "0.1.0"
+description = "MyPy to TS generator"
+authors = ["Matthew Dennis", "dennmat+myts@gmail.com"]
+readme = "README.md"
+classifiers = [
+	"Programming Language :: Python :: 3",
+	"License :: OSI Approved :: MIT License"
+]
+
+[tool.poetry.scripts]
+myts = "myts.cli:main"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+watchfiles = "^1.1.1"
+mypy = "^1.20.0"
+pyhumps = "^3.8.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[dependency-groups]
+dev = [
+    "twine (>=6.2.0,<7.0.0)",
+    "build (>=1.4.2,<2.0.0)"
+]
