@@ -1,18 +1,16 @@
 
 # Myts
 
+<!--![myts logo](assets/logo.png)-->
+
 ## Warning: v0.1.0 this is not production ready
 
-Converts MyPy types to TS types.
-
-Uses MyPy's internal api to gather type info.
+Converts MyPy types to TS types. Uses MyPy's internal api to gather type info.
 
 Call as a cli, optionally directory watchable.
-Or import and invoke directly from you Python code.
+Or import and invoke directly from your Python code.
 
 ## Installation
-
--- If you're somehow reading this right now, it's not on PyPI yet, working on it.
 
 **pip**
 ```sh
@@ -26,6 +24,41 @@ poetry add myts
 
 
 ## Usage
+
+### In your code
+
+Myts looks for any classes that inherit from `MytsType` to start building its dependency graph.
+These by default will be included in the output TS.
+
+Alternatively you can use the `myts_export` decorator on `Enum`s and `TypedDict`s and `class`es that you would like to have exported without needing to be referenced by a `MytsType` class.
+
+**Note**: Right now you cannot alias either of these, in a future version that will be okay.
+
+```python
+from enum import IntEnum
+from myts import MytsType, myts_export
+
+@myts_export
+class Fruit(IntEnum): # Will be in the TS output
+	apple = 0
+	orange = 1
+	banana = 2
+
+class Vegetable(IntEnum): # Will not be, because it is not referenced ever and is not decorated with myts_export
+	carrot = 0
+	celery = 1
+	lettuce = 2
+
+class Drink(IntEnum): # Will be in the output, reference by a MytsType below
+	water = 0
+	milk = 1
+	soda = 2
+
+class BeveragePreference(MytsType): # Will export and will also export the Drink enum
+	drink: Drink
+	person: Person
+```
+
 
 ### CLI
 
@@ -87,6 +120,7 @@ myts.export(config)
   - [ ] Variable and type naming options (camelCase, PascalCase, snake_case)
   - [ ] Interface vs type output
 - [ ] `myts_export` params to override naming and module grouping
+- [ ] Name overwriting using meta class on `MytsType` or params to `myts_export`
 
 ## Example of functionality
 Python (Mypy)

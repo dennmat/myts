@@ -5,7 +5,7 @@ from pathlib import Path
 
 from watchfiles import watch, Change
 
-from myts.core import extract, extract_types
+from myts.core import extract
 from myts.types import MytsConfiguration
 
 WATCH_IGNORE = {
@@ -26,7 +26,7 @@ def watch_filter(change: Change, path: str) -> bool:
 def main() -> None:
 	parser = argparse.ArgumentParser(
 		prog="Myts",
-		description="MyPy to other type converter -- currently only support Typescript",
+		description="MyPy to other type converter -- currently only supports Typescript",
 		epilog=""
 	)
 

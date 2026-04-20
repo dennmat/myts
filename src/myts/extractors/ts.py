@@ -328,12 +328,7 @@ def convert_ir_to_ts_ir(
 			)
 		)
 	
-	#for ts_out in ts_outputs:
-	#	ts_out.output = ts_output_to_ts(ts_out)
-	#	print("OUTPUT PATH", ts_out.path)
-	#	print(ts_out.output)
 	output_writer(ts_outputs, group, dry_run)
-
 
 def output_single(
 	outputs: list[TSOutput],
