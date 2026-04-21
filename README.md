@@ -1,7 +1,6 @@
-
-# Myts
-
-<!--![myts logo](assets/logo.png)-->
+<div align="center">
+	<img src="assets/mytslogo.png" alt="Logo" />
+</div>
 
 ## Warning: v0.1.0 this is not production ready
 

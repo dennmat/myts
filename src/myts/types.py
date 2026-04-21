@@ -2,7 +2,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, TypeAlias, Union
 
-type GroupingMode = Literal['module', 'single']
+type GroupingMode = Literal["module", "single"]
+
 
 @dataclass
 class MytsConfiguration:
@@ -15,109 +16,126 @@ class MytsConfiguration:
 	trim_root: str | None
 
 
-JSON: TypeAlias = Union[
-    dict[str, "JSON"],
-    list["JSON"],
-    str,
-    int,
-    float,
-    bool,
-    None
-]
+JSON: TypeAlias = Union[dict[str, "JSON"], list["JSON"], str, int, float, bool, None]
+
 
 @dataclass
-class PrimitiveType:
+class MytsPrimitiveType:
 	name: Literal["str", "int", "bool", "float", "none", "any"]
 
-@dataclass
-class ListType:
-	item: "TypeExpr"
 
 @dataclass
-class DictType:
-	key: "TypeExpr"
-	value: "TypeExpr"
+class MytsListType:
+	item: "MytsTypeExpr"
+
 
 @dataclass
-class UnionTypeExpr:
-	options: list["TypeExpr"]
+class MytsDictType:
+	key: "MytsTypeExpr"
+	value: "MytsTypeExpr"
+
 
 @dataclass
-class RefType:
+class MytsUnionTypeExpr:
+	options: list["MytsTypeExpr"]
+
+
+@dataclass
+class MytsRefType:
 	name: str
 	fq_name: str
 
-@dataclass
-class TypeVarType:
-	name: str
 
 @dataclass
-class LiteralValueType:
+class MytsTypeVar:
+	name: str
+
+
+@dataclass
+class MytsLiteralValue:
 	value: str | int | bool | bytes | None
 
-TypeExpr = PrimitiveType | ListType | DictType | UnionTypeExpr | RefType | TypeVarType
+
+MytsTypeExpr = (
+	MytsPrimitiveType
+	| MytsListType
+	| MytsDictType
+	| MytsUnionTypeExpr
+	| MytsRefType
+	| MytsTypeVar
+)
+
 
 @dataclass
-class Field:
+class MytsField:
 	name: str
-	type: TypeExpr
+	type: MytsTypeExpr
 	nullable: bool = False
 
+
 @dataclass
-class GenericRef:
+class MytsGenericRef:
 	fq_name: str
 	short_name: str
-	args: list[TypeExpr]
+	args: list[MytsTypeExpr]
 
 
 @dataclass
-class ClassDef:
+class MytsClassDef:
 	name: str
 	fq_name: str
 	output_module: str
-	fields: list[Field]
+	fields: list[MytsField]
 	deps: set[str]
 	type_params: list[str]
 	is_exported: bool
 
+
 @dataclass
-class TypedDictDef:
+class MytsTypedDictDef:
 	name: str
 	fq_name: str
 	output_module: str
-	fields: list[Field]
+	fields: list[MytsField]
 	deps: set[str]
 	type_params: list[str]
 	is_exported: bool
 
+
 @dataclass
-class EnumValue:
+class MytsEnumValue:
 	name: str
 	value: str | int
 
+
 EnumKind = Literal["str", "int", "mixed"]
 
+
 @dataclass
-class EnumDef:
+class MytsEnumDef:
 	kind: EnumKind
 	name: str
 	fq_name: str
 	output_module: str
-	values: list[EnumValue]
+	values: list[MytsEnumValue]
 	deps: set[str]
 	type_params: list[str]
 	is_exported: bool
 
-TypeDef = ClassDef | EnumDef | TypedDictDef
+
+MytsTypeDef = MytsClassDef | MytsEnumDef | MytsTypedDictDef
+
 
 @dataclass
 class OutputModule:
 	name: str
-	type_defs: list[TypeDef]
+	type_defs: list[MytsTypeDef]
 	imports: dict[str, set[str]]
+
 
 class MytsType:
 	"""
-		Inherit from this type to include this class and any referenced enums or TypedDicts in the myts export
+	Inherit from this type to include this class and any referenced enums or TypedDicts in the myts export
 	"""
+
 	pass
