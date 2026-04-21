@@ -14,6 +14,15 @@ jobs:
       id-token: write
       
     steps:
+      - name: Check version matches tag
+        run: |
+            VERSION=$(grep '^version =' pyproject.toml | cut -d '"' -f2)
+            TAG=${GITHUB_REF#refs/tags/v}
+            if [ "$VERSION" != "$TAG" ]; then
+            echo "Version mismatch: pyproject=$VERSION tag=$TAG"
+            exit 1
+            fi
+
       - name: Checkout
         uses: actions/checkout@v4
     
