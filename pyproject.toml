@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "myts"
-version = "0.1.1"
+version = "0.1.11"
 description = "MyPy to TS generator"
 authors = ["Matthew Dennis", "dennmat+myts@gmail.com"]
 readme = "README.md"
