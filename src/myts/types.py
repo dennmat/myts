@@ -127,7 +127,7 @@ MytsTypeDef = MytsClassDef | MytsEnumDef | MytsTypedDictDef
 
 
 @dataclass
-class OutputModule:
+class MytsModule:
 	name: str
 	type_defs: list[MytsTypeDef]
 	imports: dict[str, set[str]]

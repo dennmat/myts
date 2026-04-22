@@ -2,7 +2,7 @@
 	<img src="assets/mytslogo.png" alt="Logo" />
 </div>
 
-## Warning: v0.1.0 this is not production ready
+## In alpha this is not production ready
 
 Converts MyPy types to TS types. Uses MyPy's internal api to gather type info.
 
@@ -105,7 +105,7 @@ config = myts.MytsConfiguration(
 	trim_root="myapp.some.path" # When preserving structure, use this to trim a common root 
 )
 
-myts.export(config)
+myts.extract_ts(config)
 ```
 
 ## Roadmap

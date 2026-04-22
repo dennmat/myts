@@ -15,7 +15,6 @@ from mypy.types import (
 	get_proper_type,
 )
 
-from myts.extractors.ts import convert_ir_to_ts_ir
 from myts.types import (
 	MytsDictType,
 	MytsEnumDef,
@@ -25,7 +24,7 @@ from myts.types import (
 	MytsListType,
 	MytsLiteralValue,
 	MytsConfiguration,
-	OutputModule,
+	MytsModule,
 	MytsPrimitiveType,
 	MytsRefType,
 	MytsTypeDef,
@@ -209,11 +208,6 @@ def extract_typeddict(
 		is_exported=has_export_decorator(node),
 	)  # Once decorators are implemented is_exported will need to be changed, this determines if its auto exported vs only exported if referenced
 
-	if len(type_params) > 0:
-		return instantiate_generic(
-			typed_dict_def,
-		)
-
 	return typed_dict_def
 
 
@@ -254,7 +248,7 @@ def extract_types(build: build.BuildResult) -> dict[str, MytsTypeDef]:
 		if not tree:
 			continue
 
-		for _, sym in tree.names.items():
+		for sym in tree.names.values():
 			node = sym.node
 
 			if not isinstance(node, TypeInfo):
@@ -351,63 +345,6 @@ def topological_sort(types: dict[str, MytsTypeDef]) -> list[MytsTypeDef]:
 	return out
 
 
-def substitute(
-	type_expr: MytsTypeExpr, mapping: dict[str, MytsTypeExpr]
-) -> MytsTypeExpr:
-	if isinstance(type_expr, MytsTypeVar):
-		return mapping.get(type_expr.name, type_expr)
-
-	if isinstance(type_expr, MytsListType):
-		return MytsListType(substitute(type_expr.item, mapping))
-
-	if isinstance(type_expr, MytsDictType):
-		return MytsDictType(
-			substitute(type_expr.key, mapping), substitute(type_expr.value, mapping)
-		)
-
-	if isinstance(type_expr, MytsUnionTypeExpr):
-		return MytsUnionTypeExpr([substitute(x, mapping) for x in type_expr.options])
-
-	if isinstance(type_expr, MytsGenericRef):
-		return MytsGenericRef(
-			fq_name=type_expr.fq_name,
-			short_name=type_expr.short_name,
-			args=[substitute(x, mapping) for x in type_expr.args],
-		)
-
-	return type_expr
-
-
-def instantiate_generic(
-	base: MytsClassDef | MytsTypedDictDef, args: list[MytsTypeExpr]
-) -> MytsClassDef | MytsTypedDictDef:
-	mapping = dict(zip(base.type_params, args))
-
-	new_fields = [
-		MytsField(name=f.name, type=substitute(f.type, mapping), nullable=f.nullable)
-		for f in base.fields
-	]
-
-	if isinstance(base, MytsClassDef):
-		return MytsClassDef(
-			name=base.name,
-			fq_name=base.fq_name,
-			fields=new_fields,
-			deps=base.deps,
-			type_params=[],
-			is_exported=base.is_exported,
-		)
-
-	return MytsTypedDictDef(
-		name=base.name,
-		fq_name=base.fq_name,
-		fields=new_fields,
-		deps=base.deps,
-		type_params=[],
-		is_exported=base.is_exported,
-	)
-
-
 def collect_imports(type_defs: list[MytsTypeDef], all_types: dict[str, MytsTypeDef]):
 	imports: dict[str, set[str]] = {}  # module -> TypeDef names
 
@@ -426,7 +363,7 @@ def collect_imports(type_defs: list[MytsTypeDef], all_types: dict[str, MytsTypeD
 	return imports
 
 
-def extract(config: MytsConfiguration):
+def extract_modules(config: MytsConfiguration) -> dict[str, MytsModule]:
 	build = extract_mypy_graph(config.root)
 
 	registry = extract_types(build)
@@ -437,12 +374,12 @@ def extract(config: MytsConfiguration):
 
 	topologically_sorted = topological_sort(shooken)
 
-	modules: dict[str, OutputModule] = {}
+	modules: dict[str, MytsModule] = {}
 	for t in topologically_sorted:
 		if t.output_module in modules:
 			output_module = modules[t.output_module]
 		else:
-			output_module = OutputModule(name=t.output_module, type_defs=[], imports={})
+			output_module = MytsModule(name=t.output_module, type_defs=[], imports={})
 			modules[t.output_module] = output_module
 
 		output_module.type_defs.append(t)
@@ -450,12 +387,4 @@ def extract(config: MytsConfiguration):
 	for output_module in modules.values():
 		output_module.imports = collect_imports(output_module.type_defs, shooken)
 
-	convert_ir_to_ts_ir(
-		modules,
-		output_folder=config.output,
-		group=config.group,
-		output_file_name=config.output_file_name,
-		trim_root=config.trim_root,
-		preserve_structure=config.preserve_structure,
-		dry_run=config.dry_run,
-	)
+	return modules

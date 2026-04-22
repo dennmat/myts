@@ -6,15 +6,17 @@ from pathlib import Path
 
 import humps
 
+from myts.core import extract_modules
 from myts.types import (
 	MytsClassDef,
+	MytsConfiguration,
 	MytsDictType,
 	MytsEnumDef,
 	MytsGenericRef,
 	GroupingMode,
 	MytsListType,
 	MytsLiteralValue,
-	OutputModule,
+	MytsModule,
 	MytsPrimitiveType,
 	MytsRefType,
 	MytsTypeExpr,
@@ -97,6 +99,13 @@ class TSEnumDef:
 TSTypeDef = TSClassDef
 
 
+@dataclass
+class TSModule:
+	name: str
+	type_defs: list[TSTypeDef]
+	imports: dict[str, set[str]]
+
+
 def to_ts_type(t: MytsTypeExpr) -> TSType:
 	if isinstance(t, MytsPrimitiveType):
 		return {
@@ -137,7 +146,7 @@ def to_ts_type(t: MytsTypeExpr) -> TSType:
 @dataclass
 class TSOutput:
 	path: Path
-	module: OutputModule
+	module: MytsModule
 	type_defs: TSTypeDef
 
 
@@ -284,8 +293,8 @@ def module_to_file(
 	return module.replace(".", "/") + ".ts"
 
 
-def get_output_file(
-	module: OutputModule,
+def get_output_file_path(
+	module: TSModule,
 	output_folder: Path,
 	group: GroupingMode,
 	output_file_name: str | None = None,
@@ -301,16 +310,8 @@ def get_output_file(
 	)
 
 
-def convert_ir_to_ts_ir(
-	modules: dict[str, OutputModule],
-	output_folder: Path,
-	group: GroupingMode,
-	output_file_name: str | None = None,
-	trim_root: str | None = None,
-	preserve_structure: bool = True,
-	dry_run: bool = False,
-):
-	ts_outputs: list[TSOutput] = []
+def convert_myts_ir_to_ts_ir(modules: dict[str, MytsModule]) -> list[TSModule]:
+	ts_modules: list[TSModule] = []
 
 	for module in modules.values():
 		converted_type_defs = []
@@ -362,7 +363,29 @@ def convert_ir_to_ts_ir(
 					)
 				)
 
-		output_file = get_output_file(
+		if len(converted_type_defs) > 0:
+			ts_modules.append(
+				TSModule(
+					name=module.name,
+					type_defs=converted_type_defs,
+					imports=module.imports,
+				)
+			)
+
+	return ts_modules
+
+
+def generate_ts_outputs(
+	modules: list[TSModule],
+	output_folder: Path,
+	group: GroupingMode,
+	output_file_name: str | None = None,
+	trim_root: str | None = None,
+	preserve_structure: bool = True,
+) -> list[TSOutput]:
+	outputs: list[TSOutput] = []
+	for module in modules:
+		output_file_path = get_output_file_path(
 			module,
 			output_folder=output_folder,
 			group=group,
@@ -371,11 +394,11 @@ def convert_ir_to_ts_ir(
 			preserve_structure=preserve_structure,
 		)
 
-		ts_outputs.append(
-			TSOutput(path=output_file, module=module, type_defs=converted_type_defs)
+		outputs.append(
+			TSOutput(path=output_file_path, module=module, type_defs=module.type_defs)
 		)
 
-	output_writer(ts_outputs, group, dry_run)
+	return outputs
 
 
 def output_single(outputs: list[TSOutput], dry_run: bool = False):
@@ -431,3 +454,20 @@ def output_writer(outputs: list[TSOutput], group: GroupingMode, dry_run: bool = 
 		output_module(outputs, dry_run)
 	elif group == "single":
 		output_single(outputs, dry_run)
+
+
+def extract_ts(config: MytsConfiguration):
+	myts_modules = extract_modules(config)
+
+	ts_modules = convert_myts_ir_to_ts_ir(myts_modules)
+
+	ts_outputs = generate_ts_outputs(
+		ts_modules,
+		output_folder=config.output,
+		group=config.group,
+		output_file_name=config.output_file_name,
+		trim_root=config.trim_root,
+		preserve_structure=config.preserve_structure,
+	)
+
+	output_writer(ts_outputs, config.group, config.dry_run)
