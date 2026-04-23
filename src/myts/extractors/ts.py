@@ -259,15 +259,15 @@ def emit_ts_enum_def(tdef: TSEnumDef) -> list[str]:
 
 
 def ts_output_to_ts(output: TSOutput, include_imports: bool = True) -> str:
-	# relative_imports
 	lines_out: list[str] = []
 
-	import_lines = emit_imports(output.module.imports, output.module.name)
+	if include_imports:
+		import_lines = emit_imports(output.module.imports, output.module.name)
 
-	if len(import_lines):
-		import_lines.append("")
+		if len(import_lines):
+			import_lines.append("")
 
-	lines_out += import_lines
+		lines_out += import_lines
 
 	for t in output.type_defs:
 		if isinstance(t, TSClassDef):
@@ -429,13 +429,17 @@ def output_module(outputs: list[TSOutput], dry_run: bool = False):
 			print(out.path)
 		return
 
+	generated_date = datetime.datetime.now().isoformat()
 	for output in outputs:
+		if not output.path.parent.exists():
+			output.path.parent.mkdir(parents=True)
+
 		with open(output.path, "w") as fhndl:
 			fhndl.write(
 				"\n".join(
 					[
 						"// AUTO-GENERATED FILE - DO NOT EDIT",
-						f"// LAST-GENERATED: {datetime.datetime.now().isoformat()}",
+						f"// LAST-GENERATED: {generated_date}",
 						"",
 					]
 				)

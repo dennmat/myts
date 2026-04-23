@@ -67,6 +67,24 @@ To see all __cli__ options run
 myts -h
 ```
 
+Optionally a config file can be used.
+By default myts will attempt to find a `mytsconfig.toml` in the specified root. Alternatively a config file can be supplied through the `-c` or `--config` argument to the cli.
+
+**Note:** that arguments to the cli will override config settings found in the config.
+
+
+This is a flat toml that can optionally supply any or none of the following:
+
+```toml
+root = "/some/path" # If specifying root in the config make sure it is an absolute path
+output = "./out/" # When output is relative, it is relative to root
+group = "module" # "module" or "single"
+preserve_structure = true # When group is "module" this will create folders matching the py structure
+dry_run = false
+#output_file_name = "out.ts" # When using group = "single" this will be the name of the output file
+#trim_root = "myapp.has.a.long.root.path" # Optionally provide a python formatted module path to trim from all output
+```
+
 #### Simplest example
 
 To generate the `.ts` files. 

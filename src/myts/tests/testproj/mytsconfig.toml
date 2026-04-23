@@ -1,0 +1,3 @@
+output = "./out"
+group = "module"
+trim_root = "myts.tests.testproj"

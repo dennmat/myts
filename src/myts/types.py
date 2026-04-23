@@ -2,18 +2,39 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, TypeAlias, Union
 
+from pydantic import BaseModel
+
 type GroupingMode = Literal["module", "single"]
 
 
-@dataclass
-class MytsConfiguration:
+class MytsUnsetType:
+	__slots__ = ()
+
+	def __repr__(self) -> str:
+		return "Unset"
+
+
+MytsUnset = MytsUnsetType()
+
+
+class MytsConfiguration(BaseModel):
 	root: Path
 	output: Path
 	group: GroupingMode
 	preserve_structure: bool
 	dry_run: bool
-	output_file_name: str | None
-	trim_root: str | None
+	output_file_name: str | None = None
+	trim_root: str | None = None
+
+
+class MytsConfigurationInput(BaseModel):
+	root: Path | None = None
+	output: Path | None = None
+	group: GroupingMode | None = None
+	preserve_structure: bool | None = None
+	dry_run: bool | None = None
+	output_file_name: str | None = None
+	trim_root: str | None = None
 
 
 JSON: TypeAlias = Union[dict[str, "JSON"], list["JSON"], str, int, float, bool, None]
