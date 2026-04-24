@@ -1,29 +1,39 @@
-[tool.poetry]
+[project]
 name = "myts"
 version = "0.1.128"
 description = "MyPy to TS generator"
-authors = ["Matthew Dennis", "dennmat+myts@gmail.com"]
+authors = [
+    { name = "Matthew Dennis" },
+    { name = "dennmat+myts@gmail.com" },
+]
+requires-python = ">=3.12,<4"
 readme = "README.md"
 classifiers = [
-	"Programming Language :: Python :: 3",
-	"License :: OSI Approved :: MIT License"
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+]
+dependencies = [
+    "watchfiles>=1.1.1,<2",
+    "mypy>=1.20.0,<2",
+    "pyhumps>=3.8.0,<4",
+    "pydantic>=2.13.3,<3",
+    "rich>=15.0.0,<16",
 ]
 
-[tool.poetry.scripts]
+[project.urls]
+Homepage = "https://github.com/dennmat/myts"
+Repository = "https://github.com/dennmat/myts"
+Issues = "https://github.com/dennmat/myts/issues"
+
+[project.scripts]
 myts = "myts.cli:main"
 
-[tool.poetry.dependencies]
-python = "^3.12"
-watchfiles = "^1.1.1"
-mypy = "^1.20.0"
-pyhumps = "^3.8.0"
-pydantic = "^2.13.3"
-rich = "^15.0.0"
-pytest = "^9.0.3"
-
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["uv_build>=0.11.7,<0.12.0"]
+build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
@@ -32,13 +42,8 @@ dev = [
     "pre-commit (>=4.5.1,<5.0.0)",
     "ruff (>=0.15.11,<0.16.0)",
     "pytest (>=9.0.3,<10.0.0)"
+,
 ]
-
-[tool.poetry.urls]
-Homepage = "https://github.com/dennmat/myts"
-Repository = "https://github.com/dennmat/myts"
-Issues = "https://github.com/dennmat/myts/issues"
-
 
 [tool.ruff.format]
 indent-style = "tab"
