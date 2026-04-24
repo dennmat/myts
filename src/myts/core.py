@@ -227,7 +227,7 @@ def extract_typeddict(
 		deps,
 		type_params,
 		is_exported=has_export_decorator(node),
-	)  # Once decorators are implemented is_exported will need to be changed, this determines if its auto exported vs only exported if referenced
+	)
 
 	return typed_dict_def
 
@@ -251,14 +251,16 @@ def extract_enum(fq_name: str, node: Statement, module: build.State) -> MytsEnum
 		{},
 		[],
 		is_exported=has_export_decorator(node),
-	)  # Once decorators are implemented is_exported bla bla see above
+	)
 
 
 def extract_types(build: build.BuildResult) -> dict[str, MytsTypeDef]:
 	registry: dict[str, MytsTypeDef] = {}
 
 	for module in build.graph.values():
-		if "mypy/typeshed/" in module.path:  # Might be a better way than this
+		if "mypy/typeshed/" in module.path:
+			# Using this for now, if somehow this causes conflicts we'll likely
+			# want to do a full path comparison
 			continue
 
 		if "myts/" in module.path and "/tests/" not in module.path:
