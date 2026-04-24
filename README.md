@@ -1,8 +1,10 @@
-<div align="center">
-	<img src="assets/mytslogo.png" alt="Logo" />
-</div>
+# myts
 
-## In alpha this is not production ready
+![PyPI - Version](https://img.shields.io/pypi/v/myts)
+![GitHub License](https://img.shields.io/github/license/dennmat/myts)
+![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/dennmat/myts/release.yaml)
+
+## Alpha - this is not production ready
 
 Converts MyPy types to TS types. Uses MyPy's internal api to gather type info.
 
