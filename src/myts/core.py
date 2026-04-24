@@ -6,6 +6,7 @@ from mypy.find_sources import create_source_list
 from mypy.nodes import MemberExpr, NameExpr, Statement, TypeInfo, Var
 from mypy.options import Options
 from mypy.types import (
+	AnyType,
 	Instance,
 	LiteralType,
 	TypedDictType,
@@ -29,6 +30,7 @@ from myts.types import (
 	MytsRefType,
 	MytsTypeDef,
 	MytsTypeExpr,
+	MytsTypeParam,
 	MytsTypeVar,
 	MytsTypedDictDef,
 	MytsUnionTypeExpr,
@@ -56,22 +58,41 @@ def extract_mypy_graph(root: pathlib.Path) -> build.BuildResult:
 	return result
 
 
-def get_type_params(info) -> list[str]:
+def extract_type_params(info) -> list[str]:
 	if not info.defn.type_vars:
 		return []
 
-	return [tv for tv in info.defn.type_vars]
+	params: list[MytsTypeParam] = []
+	for type_var in info.defn.type_vars:
+		name = type_var.name
+
+		bound = None
+		constraints = None
+
+		if type_var.upper_bound:
+			upper_bound = get_proper_type(type_var.upper_bound)
+			if not isinstance(upper_bound, AnyType):
+				bound = map_type(upper_bound)
+
+		if type_var.values:
+			constraints = [
+				map_type(get_proper_type(value)) for value in type_var.values
+			]
+
+		params.append(MytsTypeParam(name=name, bound=bound, constraints=constraints))
+
+	return params
 
 
 def has_export_decorator(info) -> bool:
 	if not info.defn.decorators:
 		return False
 
-	for dec in info.defn.decorators:
-		if isinstance(dec, NameExpr) and dec.name == "myts_export":
+	for decorator in info.defn.decorators:
+		if isinstance(decorator, NameExpr) and decorator.name == "myts_export":
 			return True
 
-		if isinstance(dec, MemberExpr) and dec.name == "myts_export":
+		if isinstance(decorator, MemberExpr) and decorator.name == "myts_export":
 			return True
 
 	return False
@@ -168,7 +189,7 @@ def extract_class(fq_name: str, node: Statement, module: build.State) -> MytsCla
 		output_module,
 		fields,
 		deps,
-		get_type_params(node),
+		extract_type_params(node),
 		is_exported=True,
 	)
 
@@ -196,7 +217,7 @@ def extract_typeddict(
 		deps |= collect_refs(mapped_t)
 
 	output_module = module.id
-	type_params = get_type_params(node)
+	type_params = extract_type_params(node)
 
 	typed_dict_def = MytsTypedDictDef(
 		node.name,

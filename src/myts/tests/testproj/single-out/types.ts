@@ -1,5 +1,5 @@
 // AUTO-GENERATED FILE - DO NOT EDIT
-// LAST-GENERATED: 2026-04-22T21:54:32.490865
+// LAST-GENERATED: 2026-04-24T00:08:03.392387
 export type TestClassSimple = {
 	wow: string;
 	woah: number;
@@ -17,13 +17,13 @@ export type WoahAnother = {
 	neaterIno: SomeEnum;
 };
 
-export type NotADataclass<X, Y> = {
+export type NotADataclass<X extends Object, Y extends Object> = {
 	x: X;
 	y: X | Y;
 	z: X | Y | null;
 };
 
-export type GenericData<T> = {
+export type GenericData<T extends string | number> = {
 	content: NotADataclass<T, string>;
 	label: string;
 	test: number;

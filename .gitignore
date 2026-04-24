@@ -1,5 +1,6 @@
 # Myts specific
 src/myts/tests/testproj/out/
+DEV_SCRATCHPAD.md
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

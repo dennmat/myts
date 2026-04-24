@@ -88,6 +88,13 @@ MytsTypeExpr = (
 
 
 @dataclass
+class MytsTypeParam:
+	name: str
+	bound: MytsTypeExpr | None
+	constraints: list[MytsTypeExpr] | None
+
+
+@dataclass
 class MytsField:
 	name: str
 	type: MytsTypeExpr
@@ -108,7 +115,7 @@ class MytsClassDef:
 	output_module: str
 	fields: list[MytsField]
 	deps: set[str]
-	type_params: list[str]
+	type_params: list[MytsTypeParam]
 	is_exported: bool
 
 
@@ -119,7 +126,7 @@ class MytsTypedDictDef:
 	output_module: str
 	fields: list[MytsField]
 	deps: set[str]
-	type_params: list[str]
+	type_params: list[MytsTypeParam]
 	is_exported: bool
 
 
@@ -140,7 +147,7 @@ class MytsEnumDef:
 	output_module: str
 	values: list[MytsEnumValue]
 	deps: set[str]
-	type_params: list[str]
+	type_params: list[MytsTypeParam]
 	is_exported: bool
 
 

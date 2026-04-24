@@ -20,6 +20,7 @@ from myts.types import (
 	MytsPrimitiveType,
 	MytsRefType,
 	MytsTypeExpr,
+	MytsTypeParam,
 	MytsTypeVar,
 	MytsTypedDictDef,
 	MytsUnionTypeExpr,
@@ -66,6 +67,13 @@ TSType = TSUnion | TSPrimitive | TSArray | TSRef | TSGeneric | TSTypeVar
 
 
 @dataclass
+class TSTypeParam:
+	name: str
+	bound: TSType | None
+	constraints: list[TSType] | None
+
+
+@dataclass
 class TSField:
 	name: str
 	type: TSType
@@ -79,7 +87,7 @@ class TSClassDef:
 	py_name: str
 	output_module: str
 	fields: list[TSField]
-	generic_args: list[TSTypeVar]
+	generic_args: list[TSTypeParam]
 	as_interface: bool = False
 
 
@@ -177,7 +185,7 @@ def emit_imports(imports, current_module) -> list[str]:
 	return lines
 
 
-def ts_type_to_str(ts_type: TSType) -> str:
+def emit_ts_type(ts_type: TSType) -> str:
 	if isinstance(ts_type, TSPrimitive):
 		return ts_type.name
 
@@ -188,13 +196,13 @@ def ts_type_to_str(ts_type: TSType) -> str:
 		return ts_type.name
 
 	if isinstance(ts_type, TSArray):
-		return f"Array<{ ts_type_to_str(ts_type.item) }>"
+		return f"Array<{ emit_ts_type(ts_type.item) }>"
 
 	if isinstance(ts_type, TSUnion):
-		return f"{ ' | '.join(map(ts_type_to_str, ts_type.types)) }"
+		return f"{ ' | '.join(map(emit_ts_type, ts_type.types)) }"
 
 	if isinstance(ts_type, TSGeneric):
-		return f"{ts_type.name}<{", ".join([ts_type_to_str(t) for t in ts_type.args])}>"
+		return f"{ts_type.name}<{", ".join([emit_ts_type(t) for t in ts_type.args])}>"
 
 	if isinstance(ts_type, TSLiteralValue):
 		val = ts_type.value
@@ -211,20 +219,39 @@ def ts_type_to_str(ts_type: TSType) -> str:
 	return "any"
 
 
-def emit_ts_class_def(tdef: TSClassDef) -> list[str]:
+def emit_ts_type_params(params: list[TSTypeParam]) -> str:
+	if not params:
+		return ""
+
+	parts: list[str] = []
+
+	for param in params:
+		if param.constraints:
+			union = " | ".join(
+				emit_ts_type(constraint_type) for constraint_type in param.constraints
+			)
+			parts.append(f"{param.name} extends {union}")
+
+		elif param.bound:
+			parts.append(f"{param.name} extends {emit_ts_type(param.bound)}")
+
+		else:
+			parts.append(param.name)
+
+	return f"<{ ', '.join(parts) }>"
+
+
+def emit_ts_class_def(type_def: TSClassDef) -> list[str]:
 	lines_out: list[str] = []
 
-	# TODO make interface vs type an option
-	if len(tdef.generic_args) == 0:
-		lines_out.append(f"export type {tdef.name} = {{")
-	else:
-		lines_out.append(
-			f"export type {tdef.name}<{', '.join([v.name for v in tdef.generic_args])}> = {{"
-		)
+	params = emit_ts_type_params(type_def.generic_args)
 
-	for field in tdef.fields:
+	# TODO make interface vs type an option
+	lines_out.append(f"export type {type_def.name}{params} = {{")
+
+	for field in type_def.fields:
 		whitespace = "\t"  # if tabs else use invalid stupid spaces
-		lines_out.append(f"{whitespace}{field.name}: {ts_type_to_str(field.type)};")
+		lines_out.append(f"{whitespace}{field.name}: {emit_ts_type(field.type)};")
 
 	lines_out.append("};")
 
@@ -310,6 +337,16 @@ def get_output_file_path(
 	)
 
 
+def convert_myts_type_param_to_ts_type_param(myts_param: MytsTypeParam) -> TSTypeParam:
+	return TSTypeParam(
+		name=myts_param.name,
+		bound=to_ts_type(myts_param.bound) if myts_param.bound else None,
+		constraints=[to_ts_type(constraint) for constraint in myts_param.constraints]
+		if myts_param.constraints
+		else None,
+	)
+
+
 def convert_myts_ir_to_ts_ir(modules: dict[str, MytsModule]) -> list[TSModule]:
 	ts_modules: list[TSModule] = []
 
@@ -323,7 +360,10 @@ def convert_myts_ir_to_ts_ir(modules: dict[str, MytsModule]) -> list[TSModule]:
 						py_fq_name=tdef.fq_name,
 						py_name=tdef.name,
 						output_module=tdef.output_module,
-						generic_args=[TSTypeVar(v.name) for v in tdef.type_params],
+						generic_args=[
+							convert_myts_type_param_to_ts_type_param(v)
+							for v in tdef.type_params
+						],
 						fields=[
 							TSField(
 								humps.camelize(f.name),
@@ -341,7 +381,10 @@ def convert_myts_ir_to_ts_ir(modules: dict[str, MytsModule]) -> list[TSModule]:
 						py_fq_name=tdef.fq_name,
 						py_name=tdef.name,
 						output_module=tdef.output_module,
-						generic_args=[TSTypeVar(v.name) for v in tdef.type_params],
+						generic_args=[
+							convert_myts_type_param_to_ts_type_param(v)
+							for v in tdef.type_params
+						],
 						fields=[
 							TSField(
 								humps.camelize(f.name),

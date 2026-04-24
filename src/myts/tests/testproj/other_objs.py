@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 import enum
-from typing import Literal
+from typing import Generic, Literal, TypeVar
 
 from myts.decorators import myts_export
 from myts.tests.testproj.shared_types import AuthorTD, BookTD, FakeIntEnum
@@ -13,8 +13,11 @@ class NotADataclass[X, Y](MytsType):
 	z: X | Y | None
 
 
+T = TypeVar("T", str, int)
+
+
 @dataclass
-class GenericData[T](MytsType):
+class GenericData(Generic[T], MytsType):
 	content: NotADataclass[T, str]
 	label: str
 	test: int
