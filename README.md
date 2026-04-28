@@ -1,6 +1,7 @@
 # myts
 
 ![PyPI - Version](https://img.shields.io/pypi/v/myts)
+![PyPI - Python Version](https://img.shields.io/pypi/pyversions/myts)
 ![GitHub License](https://img.shields.io/github/license/dennmat/myts)
 ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/dennmat/myts/release.yaml)
 
@@ -18,9 +19,14 @@ Or import and invoke directly from your Python code.
 pip install myts
 ```
 
+**uv**
+```sh
+uv add --dev myts
+```
+
 **poetry**
 ```sh
-poetry add myts
+poetry add myts --group dev
 ```
 
 
@@ -70,12 +76,21 @@ myts -h
 ```
 
 Optionally a config file can be used.
-By default myts will attempt to find a `mytsconfig.toml` in the specified root. Alternatively a config file can be supplied through the `-c` or `--config` argument to the cli.
+By default myts will attempt to find a `myts.toml` in the specified root. Alternatively a config file can be supplied through the `-c` or `--config` argument to the cli.
+
+You can also specify these options under a `[tool.myts]` section in your `pyproject.toml` found at the `--root` path.
 
 **Note:** that arguments to the cli will override config settings found in the config.
 
+The resolution of options is: _(lowest → highest priority)_
 
-This is a flat toml that can optionally supply any or none of the following:
+1. pyproject `[tool.myts]`
+2. `myts.toml`
+3. command line arguments
+
+Meaning an option defined in `[tool.myts]` can and will be overwritten by the same option if provided to `myts.toml` or the command line.
+
+`myts.toml` or `[tool.myts]` is a flat toml that can optionally supply any or none of the following:
 
 ```toml
 root = "/some/path" # If specifying root in the config make sure it is an absolute path
@@ -133,7 +148,6 @@ myts.extract_ts(config)
 - [x] Export to multiple files, flat folder or matching py module structure
 - [x] Support generics
 - [x] Watch for `py` changes and auto generate `ts`
-- [ ] Export enum literal references preserved. I.e. `myvar: Literal[MyEnum.VAL]` should export as `myvar: MyEnum.VAL`
 - [ ] Config options for 
   - [ ] [Py api] override output names of vars and files
   - [ ] Variable and type naming options (camelCase, PascalCase, snake_case)

@@ -1,3 +1,4 @@
+import os
 import pathlib
 import sys
 
@@ -46,6 +47,9 @@ def should_export(class_def: TypeInfo) -> bool:
 def extract_mypy_graph(root: pathlib.Path) -> build.BuildResult:
 	options = Options()
 	options.incremental = False
+
+	if "PYTEST_CURRENT_TEST" in os.environ:  # Ensures import myts. works in tests
+		options.mypy_path = ["src"]
 
 	proj_root = str(root.resolve())
 
@@ -104,9 +108,7 @@ def map_type(t) -> MytsTypeExpr | None:
 	if isinstance(t, Instance):
 		name = t.type.fullname
 
-		if (
-			name == "builtins.str" or name == "uuid.UUID"
-		):  # or name == "datetime.datetime"?:
+		if name == "builtins.str" or name == "uuid.UUID" or name == "datetime.datetime":
 			return MytsPrimitiveType("str")
 
 		if name == "builtins.int":

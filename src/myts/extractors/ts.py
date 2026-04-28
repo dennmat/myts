@@ -455,7 +455,7 @@ def output_single(outputs: list[TSOutput], dry_run: bool = False):
 			"\n".join(
 				[
 					"// AUTO-GENERATED FILE - DO NOT EDIT",
-					f"// LAST-GENERATED: {datetime.datetime.now().isoformat()}",
+					f"// LAST GENERATED: {datetime.datetime.now().isoformat()}",
 					"",
 				]
 			)
@@ -482,7 +482,7 @@ def output_module(outputs: list[TSOutput], dry_run: bool = False):
 				"\n".join(
 					[
 						"// AUTO-GENERATED FILE - DO NOT EDIT",
-						f"// LAST-GENERATED: {generated_date}",
+						f"// LAST GENERATED: {generated_date}",
 						"",
 					]
 				)

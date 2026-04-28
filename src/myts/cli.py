@@ -4,6 +4,7 @@ import argparse
 from pathlib import Path
 import tomllib
 
+from pydantic import ValidationError
 from rich.pretty import pprint
 from watchfiles import watch, Change
 
@@ -95,7 +96,9 @@ def main() -> None:
 
 	if "root" in args and not args.root.exists() or not args.root.is_dir():
 		print(f"Provided root: {args.root} is not a valid directory.", file=sys.stderr)
-		sys.exit(2)
+		sys.exit(64)
+
+	py_project_config = get_project_toml_config(args.root)
 
 	config_at_root = get_config_at_root(
 		args.root, config_path=args.config if "config" in args else None
@@ -111,7 +114,10 @@ def main() -> None:
 		trim_root=args.trim_root if "trim_root" in args else None,
 	)
 
-	config = default_and_merge_myts_configs(Path.cwd(), config_at_root, args_config)
+	config = default_and_merge_myts_configs(
+		Path.cwd(),
+		*[c for c in [py_project_config, config_at_root, args_config] if c is not None],
+	)
 
 	if not config.output.is_absolute():
 		config.output = config.root / config.output
@@ -121,7 +127,7 @@ def main() -> None:
 
 	if not config.output.is_dir():
 		print(f"Provided output: {config.output} is not a directory.", file=sys.stderr)
-		sys.exit(2)
+		sys.exit(64)
 
 	print("Using configuration:")
 	pprint(config.model_dump())
@@ -134,11 +140,43 @@ def main() -> None:
 			extract_ts(config)
 
 
+def get_project_toml_config(root: Path) -> MytsConfigurationInput | None:
+	proj_toml_path = root / "pyproject.toml"
+
+	if not proj_toml_path.exists():
+		return None
+
+	with proj_toml_path.open("rb") as fhndl:
+		try:
+			config_data = tomllib.load(fhndl)
+		except tomllib.TOMLDecodeError:
+			print(
+				"Invalid TOML in pyproject.toml",
+				file=sys.stderr,
+			)
+			sys.exit(65)
+
+	try:
+		myts_config_data = config_data["tool"]["myts"]
+	except KeyError:
+		return None
+
+	try:
+		config = MytsConfigurationInput.model_validate(myts_config_data)
+	except ValidationError:
+		print(
+			f"Invalid configuration provided in [tool.myts] in {proj_toml_path.resolve()}"
+		)
+		sys.exit(65)
+
+	return config
+
+
 def get_config_at_root(
 	root: Path, config_path: Path | None = None
 ) -> MytsConfigurationInput | None:
 	if config_path is None:
-		config_path = root / "mytsconfig.toml"
+		config_path = root / "myts.toml"
 
 	if not config_path.exists() or not config_path.is_file():
 		return None
@@ -151,8 +189,13 @@ def get_config_at_root(
 				f"Invalid TOML in found myts config @ {config_path.resolve()}",
 				file=sys.stderr,
 			)
+			return None
 
+	try:
 		config = MytsConfigurationInput.model_validate(config_data)
+	except ValidationError:
+		print(f"Invalid configuration provided in {config_path.resolve()}")
+		sys.exit(65)
 
 	return config
 

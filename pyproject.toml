@@ -41,9 +41,14 @@ dev = [
     "build (>=1.4.2,<2.0.0)",
     "pre-commit (>=4.5.1,<5.0.0)",
     "ruff (>=0.15.11,<0.16.0)",
-    "pytest (>=9.0.3,<10.0.0)"
-,
+    "pytest (>=9.0.3,<10.0.0)",
 ]
 
 [tool.ruff.format]
 indent-style = "tab"
+
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["--import-mode=importlib"]
+
