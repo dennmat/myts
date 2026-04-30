@@ -22,6 +22,6 @@ def test_extract_modules_module(tmp_path):
 		trim_root=None,
 	)
 
-	modules = extract_modules(config)
+	registry, modules = extract_modules(config)
 
 	assert "basic.accounts.models" in modules

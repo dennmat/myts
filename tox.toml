@@ -1,14 +1,16 @@
-env_list = ["3.14", "3.13", "3.12"] #, "coverage"]
+env_list = ["3.14", "3.13", "3.12", "coverage"]
 
 [env_run_base]
 deps = ["pytest", "coverage[toml]"]
-commands = [["coverage", "run", "--source=src/", "-p", "-m", "pytest", "tests"]]
+commands = [
+	["coverage", "run", "-m", "pytest"]
+]
 
 [env.coverage]
 skip_install = true
-deps = ["coverage[toml]"]
+deps = ["coverage"]
 depends = ["3.*"]
 commands = [
 	["coverage", "combine"],
-	["coverage", "report", "--fail-under=80"]
+	["coverage", "report", "-m"],
 ]

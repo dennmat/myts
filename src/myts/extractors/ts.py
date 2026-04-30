@@ -6,12 +6,12 @@ from pathlib import Path
 
 import humps
 
-from myts.core import extract_modules
+from myts.core import build_field_collector, extract_modules
 from myts.types import (
-	MytsClassDef,
 	MytsConfiguration,
+	MytsDefType,
 	MytsDictType,
-	MytsEnumDef,
+	MytsExportType,
 	MytsGenericRef,
 	GroupingMode,
 	MytsListType,
@@ -19,10 +19,10 @@ from myts.types import (
 	MytsModule,
 	MytsPrimitiveType,
 	MytsRefType,
+	MytsTypeDef,
 	MytsTypeExpr,
 	MytsTypeParam,
 	MytsTypeVar,
-	MytsTypedDictDef,
 	MytsUnionTypeExpr,
 )
 
@@ -81,14 +81,25 @@ class TSField:
 
 
 @dataclass
-class TSClassDef:
+class TSInterfaceDef:
 	name: str
 	py_fq_name: str
 	py_name: str
+	bases: list[str]
 	output_module: str
 	fields: list[TSField]
 	generic_args: list[TSTypeParam]
-	as_interface: bool = False
+
+
+@dataclass
+class TSTypeDef:
+	name: str
+	py_fq_name: str
+	py_name: str
+	bases: list[str]
+	output_module: str
+	fields: list[TSField]
+	generic_args: list[TSTypeParam]
 
 
 @dataclass
@@ -99,12 +110,9 @@ class TSEnumValue:
 
 @dataclass
 class TSEnumDef:
-	py_enum_ir: MytsEnumDef
+	py_enum_ir: MytsTypeDef
 	name: str
 	values: list[TSEnumValue]
-
-
-TSTypeDef = TSClassDef
 
 
 @dataclass
@@ -180,7 +188,7 @@ def emit_imports(imports, current_module) -> list[str]:
 		path = relative_import(current_module, module)
 		joined = ", ".join(sorted(names))
 
-		lines.append(f'import type {{ {joined} }} from "{path}"')
+		lines.append(f'import type {{ {joined} }} from "{path}";')
 
 	return lines
 
@@ -241,19 +249,28 @@ def emit_ts_type_params(params: list[TSTypeParam]) -> str:
 	return f"<{ ', '.join(parts) }>"
 
 
-def emit_ts_class_def(type_def: TSClassDef) -> list[str]:
+def emit_ts_bases(bases: list[str]) -> str:
+	if len(bases) == 0:
+		return ""
+
+	return f" extends {', '.join(bases) }"
+
+
+def emit_ts_interface_def(type_def: TSInterfaceDef) -> list[str]:
 	lines_out: list[str] = []
 
 	params = emit_ts_type_params(type_def.generic_args)
 
+	bases = emit_ts_bases(type_def.bases)
+
 	# TODO make interface vs type an option
-	lines_out.append(f"export type {type_def.name}{params} = {{")
+	lines_out.append(f"export interface {type_def.name}{params}{bases} {{")
 
 	for field in type_def.fields:
 		whitespace = "\t"  # if tabs else use invalid stupid spaces
 		lines_out.append(f"{whitespace}{field.name}: {emit_ts_type(field.type)};")
 
-	lines_out.append("};")
+	lines_out.append("}")
 
 	return lines_out
 
@@ -297,8 +314,8 @@ def ts_output_to_ts(output: TSOutput, include_imports: bool = True) -> str:
 		lines_out += import_lines
 
 	for t in output.type_defs:
-		if isinstance(t, TSClassDef):
-			lines_out += emit_ts_class_def(t)
+		if isinstance(t, TSInterfaceDef):
+			lines_out += emit_ts_interface_def(t)
 			lines_out.append("")
 		elif isinstance(t, TSEnumDef):
 			lines_out += emit_ts_enum_def(t)
@@ -347,64 +364,61 @@ def convert_myts_type_param_to_ts_type_param(myts_param: MytsTypeParam) -> TSTyp
 	)
 
 
-def convert_myts_ir_to_ts_ir(modules: dict[str, MytsModule]) -> list[TSModule]:
+def convert_myts_ir_to_ts_ir(
+	modules: dict[str, MytsModule], myts_registry: dict[str, MytsTypeDef]
+) -> list[TSModule]:
 	ts_modules: list[TSModule] = []
+
+	collect_fields = build_field_collector(myts_registry)
 
 	for module in modules.values():
 		converted_type_defs = []
-		for tdef in module.type_defs:
-			if isinstance(tdef, MytsClassDef):
-				converted_type_defs.append(
-					TSClassDef(
-						name=humps.pascalize(tdef.name),
-						py_fq_name=tdef.fq_name,
-						py_name=tdef.name,
-						output_module=tdef.output_module,
-						generic_args=[
-							convert_myts_type_param_to_ts_type_param(v)
-							for v in tdef.type_params
-						],
-						fields=[
-							TSField(
-								humps.camelize(f.name),
-								to_ts_type(f.type),
-								optional=f.nullable,
-							)
-							for f in tdef.fields
-						],
-					)
-				)
-			elif isinstance(tdef, MytsTypedDictDef):
-				converted_type_defs.append(
-					TSClassDef(
-						name=humps.pascalize(tdef.name),
-						py_fq_name=tdef.fq_name,
-						py_name=tdef.name,
-						output_module=tdef.output_module,
-						generic_args=[
-							convert_myts_type_param_to_ts_type_param(v)
-							for v in tdef.type_params
-						],
-						fields=[
-							TSField(
-								humps.camelize(f.name),
-								to_ts_type(f.type),
-								optional=f.nullable,
-							)
-							for f in tdef.fields
-						],
-					)
-				)
-			elif isinstance(tdef, MytsEnumDef):
+		for type_def in module.type_defs:
+			if type_def.type == MytsDefType.ENUM:
 				converted_type_defs.append(
 					TSEnumDef(
-						name=humps.pascalize(tdef.name),
-						py_enum_ir=tdef,
+						name=type_def.name,
+						py_enum_ir=type_def,
 						values=[
-							TSEnumValue(name=v.name, value=v.value) for v in tdef.values
+							TSEnumValue(name=v.name, value=v.value)
+							for v in type_def.enum_values
 						],
 					)
 				)
+			elif type_def.type == MytsDefType.OBJECT:
+				fields = collect_fields(type_def.fq_name)
+
+				mapped_bases = [
+					myts_registry[base]
+					for base in type_def.bases
+					if base in myts_registry
+					and myts_registry[base].export
+					in (MytsExportType.EXPORT, MytsExportType.ROOT)
+				]
+
+				converted_type_defs.append(
+					TSInterfaceDef(
+						name=humps.pascalize(type_def.name),
+						py_fq_name=type_def.fq_name,
+						py_name=type_def.name,
+						output_module=type_def.output_module,
+						bases=[humps.pascalize(base.name) for base in mapped_bases],
+						generic_args=[
+							convert_myts_type_param_to_ts_type_param(v)
+							for v in type_def.type_params
+						],
+						fields=[
+							TSField(
+								humps.camelize(f.name),
+								to_ts_type(f.type),
+								optional=f.nullable,
+							)
+							for f in fields
+						],
+					)
+				)
+			elif type_def.type in (MytsDefType.UNION, MytsDefType.ALIAS):
+				...
 
 		if len(converted_type_defs) > 0:
 			ts_modules.append(
@@ -454,7 +468,7 @@ def output_single(outputs: list[TSOutput], dry_run: bool = False):
 		fhndl.write(
 			"\n".join(
 				[
-					"// AUTO-GENERATED FILE - DO NOT EDIT",
+					"// AUTO-GENERATED FILE BY MYTS - DO NOT EDIT",
 					f"// LAST GENERATED: {datetime.datetime.now().isoformat()}",
 					"",
 				]
@@ -481,7 +495,7 @@ def output_module(outputs: list[TSOutput], dry_run: bool = False):
 			fhndl.write(
 				"\n".join(
 					[
-						"// AUTO-GENERATED FILE - DO NOT EDIT",
+						"// AUTO-GENERATED FILE BY MYTS - DO NOT EDIT",
 						f"// LAST GENERATED: {generated_date}",
 						"",
 					]
@@ -504,9 +518,9 @@ def output_writer(outputs: list[TSOutput], group: GroupingMode, dry_run: bool = 
 
 
 def extract_ts(config: MytsConfiguration):
-	myts_modules = extract_modules(config)
+	myts_registry, myts_modules = extract_modules(config)
 
-	ts_modules = convert_myts_ir_to_ts_ir(myts_modules)
+	ts_modules = convert_myts_ir_to_ts_ir(myts_modules, myts_registry)
 
 	ts_outputs = generate_ts_outputs(
 		ts_modules,

@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 from typing import Literal, TypeAlias, Union
 
@@ -108,26 +109,18 @@ class MytsGenericRef:
 	args: list[MytsTypeExpr]
 
 
-@dataclass
-class MytsClassDef:
-	name: str
-	fq_name: str
-	output_module: str
-	fields: list[MytsField]
-	deps: set[str]
-	type_params: list[MytsTypeParam]
-	is_exported: bool
+class MytsDefType(Enum):
+	OBJECT = "object"
+	UNION = "union"
+	ALIAS = "alias"
+	ENUM = "enum"
 
 
-@dataclass
-class MytsTypedDictDef:
-	name: str
-	fq_name: str
-	output_module: str
-	fields: list[MytsField]
-	deps: set[str]
-	type_params: list[MytsTypeParam]
-	is_exported: bool
+class MytsExportType(Enum):
+	ROOT = "root"
+	EXPORT = "export"
+	INTERNAL = "internal"
+	EXCLUDE = "exclude"
 
 
 @dataclass
@@ -136,22 +129,19 @@ class MytsEnumValue:
 	value: str | int
 
 
-EnumKind = Literal["str", "int", "mixed"]
-
-
+# WIP this will replace ClassDef/TypedDictDef and EnumDef
 @dataclass
-class MytsEnumDef:
-	kind: EnumKind
+class MytsTypeDef:
+	export: MytsExportType
+	type: MytsDefType
 	name: str
 	fq_name: str
 	output_module: str
-	values: list[MytsEnumValue]
+	bases: list[str]
+	fields: list[MytsField]
 	deps: set[str]
 	type_params: list[MytsTypeParam]
-	is_exported: bool
-
-
-MytsTypeDef = MytsClassDef | MytsEnumDef | MytsTypedDictDef
+	enum_values: list[MytsEnumValue]
 
 
 @dataclass

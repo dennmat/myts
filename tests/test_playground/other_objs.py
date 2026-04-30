@@ -3,7 +3,7 @@ import enum
 from typing import Generic, Literal, TypeVar
 
 from myts.decorators import myts_export
-from myts.tests.testproj.shared_types import AuthorTD, BookTD, FakeIntEnum
+from tests.testproj.shared_types import AuthorTD, BookTD, FakeIntEnum
 from myts.types import MytsType
 
 

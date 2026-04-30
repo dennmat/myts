@@ -1,13 +1,13 @@
+from mypy.nodes import Statement
+
 from myts.types import (
-	EnumKind,
-	MytsEnumValue,
 	MytsPrimitiveType,
 	MytsTypeExpr,
 	MytsUnionTypeExpr,
 )
 
 
-def is_subclass_of(info, fullname: str | tuple[str]) -> bool:
+def is_subclass_of(info: Statement, fullname: str | tuple[str]) -> bool:
 	"""
 	Given an unknown obj and a fullname, this will determine if the py obj inherits from the fullname at any point.
 	"""
@@ -31,15 +31,3 @@ def split_nullable(union: MytsUnionTypeExpr) -> tuple[MytsTypeExpr, bool]:
 		return non_null[0], True
 
 	return union, False
-
-
-def detect_enum_kind(values: list[MytsEnumValue]) -> EnumKind:
-	types = {type(v.value) for v in values if v.value is not None}
-
-	if types == {str}:
-		return "str"
-
-	if types <= {int}:
-		return "int"
-
-	return "mixed"

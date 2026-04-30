@@ -1,10 +1,13 @@
+from functools import lru_cache
+import itertools
 import os
 import pathlib
 import sys
+from typing import Callable
 
 from mypy import build
 from mypy.find_sources import create_source_list
-from mypy.nodes import MemberExpr, NameExpr, Statement, TypeInfo, Var
+from mypy.nodes import CallExpr, MemberExpr, NameExpr, Statement, StrExpr, TypeInfo, Var
 from mypy.options import Options
 from mypy.types import (
 	AnyType,
@@ -18,9 +21,10 @@ from mypy.types import (
 )
 
 from myts.types import (
+	MytsDefType,
 	MytsDictType,
-	MytsEnumDef,
 	MytsEnumValue,
+	MytsExportType,
 	MytsField,
 	MytsGenericRef,
 	MytsListType,
@@ -33,15 +37,9 @@ from myts.types import (
 	MytsTypeExpr,
 	MytsTypeParam,
 	MytsTypeVar,
-	MytsTypedDictDef,
 	MytsUnionTypeExpr,
-	MytsClassDef,
 )
-from myts.utils import detect_enum_kind, is_subclass_of, split_nullable
-
-
-def should_export(class_def: TypeInfo) -> bool:
-	return is_subclass_of(class_def, "myts.types.MytsType")
+from myts.utils import is_subclass_of, split_nullable
 
 
 def extract_mypy_graph(root: pathlib.Path) -> build.BuildResult:
@@ -62,7 +60,7 @@ def extract_mypy_graph(root: pathlib.Path) -> build.BuildResult:
 	return result
 
 
-def extract_type_params(info) -> list[str]:
+def extract_type_params(info: TypeInfo) -> list[str]:
 	if not info.defn.type_vars:
 		return []
 
@@ -88,18 +86,66 @@ def extract_type_params(info) -> list[str]:
 	return params
 
 
-def has_export_decorator(info) -> bool:
+def has_export_decorator(info: TypeInfo) -> bool:
 	if not info.defn.decorators:
 		return False
 
 	for decorator in info.defn.decorators:
-		if isinstance(decorator, NameExpr) and decorator.name == "myts_export":
-			return True
-
-		if isinstance(decorator, MemberExpr) and decorator.name == "myts_export":
+		if (
+			isinstance(decorator, NameExpr) or isinstance(decorator, MemberExpr)
+		) and decorator.name == "myts_export":
 			return True
 
 	return False
+
+
+def parse_export_args(call: CallExpr) -> MytsExportType:
+	result = MytsExportType.EXPORT
+
+	if call.args:
+		arg = call.args[0]
+
+		# @myts_export(False)
+		if isinstance(arg, NameExpr):
+			if arg.name == "False":
+				result = MytsExportType.EXCLUDE
+
+	for name, arg in zip(call.arg_names, call.args):
+		if name == "mode":
+			if isinstance(arg, StrExpr):
+				try:
+					value = MytsExportType(arg.value)
+				except ValueError:
+					# TODO: Should we warn myts_export got an invalid value?
+					return None
+				else:
+					result = value
+
+	return result
+
+
+def parse_myts_export(info: TypeInfo) -> MytsExportType | None:
+	if not info.defn.decorators:
+		return None
+
+	for decorator in info.defn.decorators:
+		# @myts_export
+		if isinstance(decorator, NameExpr) and decorator.name == "myts_export":
+			return MytsExportType.EXPORT
+
+		# @myts.myts_export
+		if isinstance(decorator, MemberExpr) and decorator.name == "myts_export":
+			return MytsExportType.EXPORT
+
+		# @myts_export(...)
+		if isinstance(decorator, CallExpr):
+			callee = decorator.callee
+
+			if isinstance(callee, NameExpr) and callee.name == "myts_export":
+				return parse_export_args(decorator)
+
+			if isinstance(callee, MemberExpr) and callee.name == "myts_export":
+				return parse_export_args(decorator)
 
 
 def map_type(t) -> MytsTypeExpr | None:
@@ -143,13 +189,6 @@ def map_type(t) -> MytsTypeExpr | None:
 		return MytsPrimitiveType("None")
 
 	if isinstance(t, LiteralType):
-		if is_subclass_of(t.fallback.type, "enum.Enum"):
-			...
-			# What we want is to add the referenced enum as a dependency
-			# so it gets included
-			# then we want to output it as it is effectively so likle MyEnum.THIS | that | this
-			# this naive implementation outputs "THIS" | ...
-			# return LiteralValueType()
 		return MytsLiteralValue(value=t.value)
 
 	if isinstance(t, TypedDictType):
@@ -158,7 +197,31 @@ def map_type(t) -> MytsTypeExpr | None:
 	return MytsPrimitiveType("any")
 
 
-def extract_class(fq_name: str, node: Statement, module: build.State) -> MytsClassDef:
+def extract_type(
+	myts_type: MytsDefType, fq_name: str, node: Statement, module: build.State
+) -> MytsTypeDef:
+	if myts_type == MytsDefType.ENUM:
+		return extract_enum(fq_name, node, module)
+
+	export = parse_myts_export(node)
+	is_myts_subclass = is_subclass_of(node, "myts.types.MytsType")
+
+	# myts_export wasn't used, but this is a MytsType inherited obj
+	# mark it as a ROOT export
+	if export is None and is_myts_subclass:
+		export = MytsExportType.ROOT
+
+	bases = []
+
+	for base in node.bases:
+		base_type = get_proper_type(base)
+
+		if isinstance(base_type, Instance):
+			bases.append(base.type.fullname)
+
+	if node.typeddict_type:
+		return extract_typeddict(bases, export, myts_type, fq_name, node, module)
+
 	fields = []
 	deps: set[str] = set()
 
@@ -174,31 +237,38 @@ def extract_class(fq_name: str, node: Statement, module: build.State) -> MytsCla
 		if snode.type is None:
 			continue
 
-		t = get_proper_type(snode.type)
+		proper_type = get_proper_type(snode.type)
 
 		nullable = False
-		if isinstance(t, MytsUnionTypeExpr):
-			t, nullable = split_nullable(t)
+		if isinstance(proper_type, MytsUnionTypeExpr):
+			proper_type, nullable = split_nullable(proper_type)
 
-		mapped_t = map_type(t)
+		mapped_t = map_type(proper_type)
 		fields.append(MytsField(name, mapped_t, nullable))
 		deps |= collect_refs(mapped_t)
 
-	output_module = module.id
-	return MytsClassDef(
-		node.name,
-		fq_name,
-		output_module,
-		fields,
-		deps,
-		extract_type_params(node),
-		is_exported=True,
+	return MytsTypeDef(
+		type=myts_type,
+		export=export,
+		name=node.name,
+		fq_name=fq_name,
+		output_module=module.id,
+		bases=bases,
+		fields=fields,
+		deps=deps,
+		type_params=extract_type_params(node),
+		enum_values=[],
 	)
 
 
 def extract_typeddict(
-	fq_name: str, node: Statement, module: build.State
-) -> MytsTypedDictDef:
+	bases: list[str],
+	export: MytsExportType,
+	myts_type: MytsDefType,
+	fq_name: str,
+	node: Statement,
+	module: build.State,
+) -> MytsTypeDef:
 	fields = []
 	deps: set[str] = set()
 
@@ -221,39 +291,55 @@ def extract_typeddict(
 	output_module = module.id
 	type_params = extract_type_params(node)
 
-	typed_dict_def = MytsTypedDictDef(
-		node.name,
-		fq_name,
-		output_module,
-		fields,
-		deps,
-		type_params,
-		is_exported=has_export_decorator(node),
+	typed_dict_def = MytsTypeDef(
+		export=export,
+		type=myts_type,
+		name=node.name,
+		bases=bases,
+		fq_name=fq_name,
+		output_module=output_module,
+		fields=fields,
+		deps=deps,
+		type_params=type_params,
+		enum_values=[],
 	)
 
 	return typed_dict_def
 
 
-def extract_enum(fq_name: str, node: Statement, module: build.State) -> MytsEnumDef:
+def extract_enum(fq_name: str, node: Statement, module: build.State) -> MytsTypeDef:
 	values: list[MytsEnumValue] = []
 
 	for name, sym in node.names.items():
 		if isinstance(sym.node, Var) and sym.node.is_final:
 			values.append(MytsEnumValue(name, sym.node.type.last_known_value.value))
 
-	enum_kind = detect_enum_kind(values)
-
 	output_module = module.id
-	return MytsEnumDef(
-		enum_kind,
-		node.name,
-		fq_name,
-		output_module,
-		values,
-		{},
-		[],
-		is_exported=has_export_decorator(node),
+	return MytsTypeDef(
+		export=MytsExportType.ROOT,
+		type=MytsDefType.ENUM,
+		name=node.name,
+		fq_name=fq_name,
+		output_module=output_module,
+		bases=[],
+		fields=[],
+		deps=set(),
+		type_params=[],
+		enum_values=values,
 	)
+
+
+def parse_myts_type(node: TypeInfo) -> MytsDefType | None:
+	if is_subclass_of(node, ("enum.Enum", "enum.IntEnum", "enum.StrEnum")):
+		return MytsDefType.ENUM
+
+	elif node.typeddict_type is not None:
+		return MytsDefType.OBJECT
+
+	elif is_subclass_of(node, "myts.types.MytsType"):
+		return MytsDefType.OBJECT
+
+	return None
 
 
 def extract_types(build: build.BuildResult) -> dict[str, MytsTypeDef]:
@@ -284,14 +370,14 @@ def extract_types(build: build.BuildResult) -> dict[str, MytsTypeDef]:
 			if fq_name.startswith("myts") and not fq_name.startswith("myts.tests"):
 				continue
 
-			if is_subclass_of(node, ("enum.Enum", "enum.IntEnum", "enum.StrEnum")):
-				registry[fq_name] = extract_enum(fq_name, node, module)
+			myts_type = parse_myts_type(node)
 
-			elif node.typeddict_type is not None:
-				registry[fq_name] = extract_typeddict(fq_name, node, module)
-
-			elif should_export(node):
-				registry[fq_name] = extract_class(fq_name, node, module)
+			if myts_type is not None:
+				if not fq_name.startswith(module.id):
+					# This is likely due to being a reference, we don't want to override
+					# this ensures we're only extracting when module and node are the same
+					continue
+				registry[fq_name] = extract_type(myts_type, fq_name, node, module)
 
 	return registry
 
@@ -319,6 +405,41 @@ def collect_refs(type_expr: MytsTypeExpr) -> set[str]:
 		return out
 
 	return set()
+
+
+def build_field_collector(
+	registry: dict[str, MytsTypeDef],
+) -> Callable[[str], tuple[MytsField]]:
+	"""
+	Returns a method that accepts a fq_name to fetch fields info for.
+	Caches on fq_name.
+	"""
+
+	@lru_cache(maxsize=None)
+	def collect_fields(fq_name: str) -> tuple[MytsField, ...]:
+		if fq_name not in registry:
+			return ()
+
+		type_def = registry[fq_name]
+
+		field_map: dict[str, MytsField] = {}
+
+		for base in type_def.bases:
+			if base not in registry:
+				continue
+
+			base_def = registry[base]
+
+			if base_def.export in (MytsExportType.EXCLUDE, MytsExportType.INTERNAL):
+				for field in collect_fields(base):
+					field_map[field.name] = field
+
+		for field in type_def.fields:
+			field_map[field.name] = field
+
+		return tuple(field_map.values())
+
+	return collect_fields
 
 
 def resolve_dependencies(
@@ -370,17 +491,22 @@ def topological_sort(types: dict[str, MytsTypeDef]) -> list[MytsTypeDef]:
 	return out
 
 
-def collect_imports(type_defs: list[MytsTypeDef], all_types: dict[str, MytsTypeDef]):
+def collect_imports(type_defs: list[MytsTypeDef], registry: dict[str, MytsTypeDef]):
 	imports: dict[str, set[str]] = {}  # module -> TypeDef names
 
-	for t in type_defs:
-		for dep in t.deps:
-			if dep not in all_types:
+	for type_def in type_defs:
+		for dep in itertools.chain(type_def.deps, type_def.bases):
+			if dep not in registry:
 				continue
 
-			dep_type = all_types[dep]
+			dep_type = registry[dep]
 
-			if dep_type.output_module == t.output_module:
+			# Only include if the type is exportable
+			# most likely scenarios are excluded "MytsType" inherited utility classes
+			if dep_type.export in (MytsExportType.EXCLUDE, MytsExportType.INTERNAL):
+				continue
+
+			if dep_type.output_module == type_def.output_module:
 				continue
 
 			imports.setdefault(dep_type.output_module, set()).add(dep_type.name)
@@ -388,12 +514,18 @@ def collect_imports(type_defs: list[MytsTypeDef], all_types: dict[str, MytsTypeD
 	return imports
 
 
-def extract_modules(config: MytsConfiguration) -> dict[str, MytsModule]:
+def extract_modules(
+	config: MytsConfiguration,
+) -> tuple[dict[str, MytsTypeDef], dict[str, MytsModule]]:
 	build = extract_mypy_graph(config.root)
 
 	registry = extract_types(build)
 
-	roots = [t for t in registry.values() if t.is_exported]
+	roots = [
+		t
+		for t in registry.values()
+		if t.export in (MytsExportType.ROOT, MytsExportType.EXPORT)
+	]
 
 	shooken = resolve_dependencies(roots, registry)
 
@@ -412,4 +544,4 @@ def extract_modules(config: MytsConfiguration) -> dict[str, MytsModule]:
 	for output_module in modules.values():
 		output_module.imports = collect_imports(output_module.type_defs, shooken)
 
-	return modules
+	return registry, modules
