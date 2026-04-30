@@ -1,6 +1,6 @@
 [project]
 name = "myts"
-version = "0.1.128"
+version = "0.1.13"
 description = "MyPy to TS generator"
 authors = [
     { name = "Matthew Dennis" },
