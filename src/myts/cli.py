@@ -29,7 +29,7 @@ def watch_filter(_: Change, path: str) -> bool:
 	return not any(part in WATCH_IGNORE for part in pathlib.Path(path).parts)
 
 
-def main() -> None:
+def main(args: list[str] | None = None) -> None:
 	parser = argparse.ArgumentParser(
 		prog="Myts",
 		description="MyPy to other type converter -- currently only supports Typescript",
@@ -92,20 +92,26 @@ def main() -> None:
 	)
 	parser.add_argument("-c", "--config", default=argparse.SUPPRESS, type=Path)
 
-	args = parser.parse_args()
+	args = parser.parse_args(args=args)
 
-	if "root" in args and not args.root.exists() or not args.root.is_dir():
-		print(f"Provided root: {args.root} is not a valid directory.", file=sys.stderr)
+	root = Path.cwd()
+	if "root" in args:
+		root = args.root
+
+	root = root.resolve()
+
+	if not root.exists() or not root.is_dir():
+		print(f"Provided root: {root} is not a valid directory.", file=sys.stderr)
 		sys.exit(64)
 
-	py_project_config = get_project_toml_config(args.root)
+	py_project_config = get_project_toml_config(root)
 
 	config_at_root = get_config_at_root(
-		args.root, config_path=args.config if "config" in args else None
+		root, config_path=args.config if "config" in args else None
 	)
 
 	args_config = MytsConfigurationInput(
-		root=args.root if "root" in args else None,
+		root=root if "root" in args else None,
 		output=args.output if "output" in args else None,
 		group=args.group if "group" in args else None,
 		preserve_structure=not args.no_folders if "no_folders" in args else None,
@@ -138,6 +144,8 @@ def main() -> None:
 		print("Watching")
 		for _ in watch(config.root, watch_filter=watch_filter, debounce=300):
 			extract_ts(config)
+
+	print("Myts all done.")
 
 
 def get_project_toml_config(root: Path) -> MytsConfigurationInput | None:

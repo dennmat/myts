@@ -7,10 +7,25 @@ from ..accounts.models import User
 class ActorInfo(TypedDict):
 	full_name: str
 	age: int
-	movies: list["Movie"]
+	movies: list["MovieBase"]
 
 
-class Movie(TSExport):
-	uploaded_by: User
+class MediaBase(TSExport):
 	title: str
+	uploaded_by: User
+
+
+class MovieBase(MediaBase):
 	actors: list[ActorInfo]
+
+
+class ComedyMovie(MovieBase):
+	how_funny: int
+
+
+class DocumentaryMovie(MovieBase):
+	how_serious: int
+
+
+class Streamable[T: MediaBase](TSExport):
+	media: T

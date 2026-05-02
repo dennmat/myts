@@ -88,7 +88,7 @@ def assert_dirs_equal(actual: dict[str, str], expected: dict[str, str]):
 
 
 def assert_snapshot(project_name: str, tmp_path: Path):
-	root = Path("tests/projects") / project_name
+	root = Path("./tests/projects") / project_name
 
 	src = root / "src"
 	expected_dir = root / "expected"

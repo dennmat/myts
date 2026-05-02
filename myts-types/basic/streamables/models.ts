@@ -1,5 +1,5 @@
 // AUTO-GENERATED FILE BY MYTS - DO NOT EDIT
-// LAST GENERATED: 2026-04-30T10:09:47.429304
+// LAST GENERATED: 2026-05-02T10:20:45.168457
 import type { User } from "../accounts/models";
 
 export interface MediaBase {

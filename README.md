@@ -172,7 +172,7 @@ class SomeEnum(IntEnum): # Automatically exported due to being reference by Othe
 	B = 6
 	C = 12
 
-class MyTypedDict[T](TypedDict): # Generics supported
+class MyTypedDict[T: "Example"](TypedDict): # Generics supported
 	a: NotRequired[T]
 	b: Literal["one", "two", "three"]
 
@@ -201,7 +201,7 @@ export enum SomeEnum {
 	C = 12,
 }
 
-export type MyTypedDict<T> = {
+export type MyTypedDict<T extends Example> = {
 	a?: T;
 	b: "one" | "two" | "three";
 };

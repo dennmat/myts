@@ -483,7 +483,7 @@ wheels = [
 
 [[package]]
 name = "myts"
-version = "0.1.128"
+version = "0.2.0"
 source = { editable = "." }
 dependencies = [
     { name = "mypy" },

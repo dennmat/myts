@@ -514,6 +514,14 @@ def collect_imports(type_defs: list[MytsTypeDef], registry: dict[str, MytsTypeDe
 	return imports
 
 
+def extract_roots(registry: dict[str, MytsTypeDef]) -> list[MytsTypeDef]:
+	return [
+		t
+		for t in registry.values()
+		if t.export in (MytsExportType.ROOT, MytsExportType.EXPORT)
+	]
+
+
 def extract_modules(
 	config: MytsConfiguration,
 ) -> tuple[dict[str, MytsTypeDef], dict[str, MytsModule]]:
@@ -521,11 +529,7 @@ def extract_modules(
 
 	registry = extract_types(build)
 
-	roots = [
-		t
-		for t in registry.values()
-		if t.export in (MytsExportType.ROOT, MytsExportType.EXPORT)
-	]
+	roots = extract_roots(registry)
 
 	shooken = resolve_dependencies(roots, registry)
 
