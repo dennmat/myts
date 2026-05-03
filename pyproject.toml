@@ -56,7 +56,7 @@ addopts = ["--import-mode=importlib"]
 branch = true
 parallel = true
 source = ["myts"]
-omit = ["__main__.py"]
+omit = ["__main__.py", "src/**"]
 
 [tool.coverage.report]
 fail_under = 60
@@ -67,3 +67,4 @@ exclude_lines = [
     'if TYPE_CHECKING:',
     'if __name__ == "__main__":'
 ]
+

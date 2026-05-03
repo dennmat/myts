@@ -13,4 +13,5 @@ depends = ["3.*"]
 commands = [
 	["coverage", "combine"],
 	["coverage", "report", "-m"],
+	["coverage", "html"]
 ]

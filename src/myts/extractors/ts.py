@@ -210,7 +210,7 @@ def emit_ts_type(ts_type: TSType) -> str:
 		return f"{ ' | '.join(map(emit_ts_type, ts_type.types)) }"
 
 	if isinstance(ts_type, TSGeneric):
-		return f"{ts_type.name}<{", ".join([emit_ts_type(t) for t in ts_type.args])}>"
+		return f"{ts_type.name}<{', '.join([emit_ts_type(t) for t in ts_type.args])}>"
 
 	if isinstance(ts_type, TSLiteralValue):
 		val = ts_type.value
