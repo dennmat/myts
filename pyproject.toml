@@ -17,7 +17,7 @@ classifiers = [
 ]
 dependencies = [
     "watchfiles>=1.1.1,<2",
-    "mypy>=1.20.0,<2",
+    "mypy>=2.0.0",
     "pyhumps>=3.8.0,<4",
     "pydantic>=2.13.3,<3",
     "rich>=15.0.0,<16",
@@ -43,12 +43,14 @@ dev = [
     "ruff (>=0.15.11,<0.16.0)",
     "pytest (>=9.0.3,<10.0.0)",
     "tox>=4.53.0",
+    "ipdb>=0.13.13",
 ]
 
 [tool.ruff.format]
 indent-style = "tab"
 
 [tool.pytest.ini_options]
+pythonpath = ["src"]
 testpaths = ["tests"]
 addopts = ["--import-mode=importlib"]
 

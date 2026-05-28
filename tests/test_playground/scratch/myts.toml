@@ -1,3 +1,3 @@
 output = "./out"
 group = "module"
-trim_root = "myts.tests.testproj"
+trim_root = "test_playground"

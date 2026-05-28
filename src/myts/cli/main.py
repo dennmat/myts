@@ -2,15 +2,20 @@ import pathlib
 import sys
 import argparse
 from pathlib import Path
-import tomllib
 
-from pydantic import ValidationError
 from rich.pretty import pprint
 from watchfiles import watch, Change
 
-from myts.configs import default_and_merge_myts_configs
-from myts.extractors.ts import extract_ts
-from myts.types import MytsConfigurationInput
+from myts.config import (
+	MytsConfiguration,
+	MytsConfigurationInput,
+	default_and_merge_myts_configs,
+	get_config_at_root,
+	get_project_toml_config,
+)
+from myts.core.analyze import create_analyzer
+from myts.exporters.ts.exporter import TSExporter
+
 
 WATCH_IGNORE = {
 	"__pycache__",
@@ -148,64 +153,15 @@ def main(args: list[str] | None = None) -> None:
 	print("Myts all done.")
 
 
-def get_project_toml_config(root: Path) -> MytsConfigurationInput | None:
-	proj_toml_path = root / "pyproject.toml"
+def extract_ts(config: MytsConfiguration):
+	analyzer = create_analyzer(config)
 
-	if not proj_toml_path.exists():
-		return None
+	analysis_result = analyzer.analyze()
 
-	with proj_toml_path.open("rb") as fhndl:
-		try:
-			config_data = tomllib.load(fhndl)
-		except tomllib.TOMLDecodeError:
-			print(
-				"Invalid TOML in pyproject.toml",
-				file=sys.stderr,
-			)
-			sys.exit(65)
+	exporter = TSExporter()
 
-	try:
-		myts_config_data = config_data["tool"]["myts"]
-	except KeyError:
-		return None
-
-	try:
-		config = MytsConfigurationInput.model_validate(myts_config_data)
-	except ValidationError:
-		print(
-			f"Invalid configuration provided in [tool.myts] in {proj_toml_path.resolve()}"
-		)
-		sys.exit(65)
-
-	return config
-
-
-def get_config_at_root(
-	root: Path, config_path: Path | None = None
-) -> MytsConfigurationInput | None:
-	if config_path is None:
-		config_path = root / "myts.toml"
-
-	if not config_path.exists() or not config_path.is_file():
-		return None
-
-	with config_path.open("rb") as fhndl:
-		try:
-			config_data = tomllib.load(fhndl)
-		except tomllib.TOMLDecodeError:
-			print(
-				f"Invalid TOML in found myts config @ {config_path.resolve()}",
-				file=sys.stderr,
-			)
-			return None
-
-	try:
-		config = MytsConfigurationInput.model_validate(config_data)
-	except ValidationError:
-		print(f"Invalid configuration provided in {config_path.resolve()}")
-		sys.exit(65)
-
-	return config
+	ts_ir = exporter.transform(analysis_result, config)
+	exporter.emit(ts_ir, config)
 
 
 if __name__ == "__main__":

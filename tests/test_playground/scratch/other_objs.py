@@ -2,9 +2,9 @@ from dataclasses import dataclass
 import enum
 from typing import Generic, Literal, TypeVar
 
-from myts.decorators import myts_export
-from tests.testproj.shared_types import AuthorTD, BookTD, FakeIntEnum
-from myts.types import MytsType
+from myts.core.decorators import myts_export
+from .shared_types import AuthorTD, BookTD, FakeIntEnum
+from myts.core.types import MytsType
 
 
 class NotADataclass[X, Y](MytsType):
@@ -25,6 +25,7 @@ class GenericData(Generic[T], MytsType):
 
 @dataclass
 class MyOtherFakeClass(MytsType):
+	bleh: str
 	this: list[int]
 	that: list[dict[str, int]]
 	gentest: GenericData[str]
@@ -42,7 +43,7 @@ class MyFakeBookShelf(MytsType):
 	some_lits: Literal["Hi", "bye", 'no "not" no', None, True, 34, -32] | int
 
 
-@myts_export
+@myts_export()
 class ForcedEnumExport(enum.IntEnum):
 	do = 1
 	it = 2

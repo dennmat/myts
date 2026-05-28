@@ -1,14 +1,14 @@
 import itertools
 from pathlib import Path
 
-from myts.core import (
+from mytsold.core import (
 	extract_modules,
 	extract_mypy_graph,
 	extract_roots,
 	extract_types,
 	resolve_dependencies,
 )
-from myts.types import MytsConfiguration, MytsExportType, MytsTypeDef
+from mytsold.types import MytsConfiguration, MytsExportType, MytsTypeDef
 
 
 def test_extract_mypy_graph():

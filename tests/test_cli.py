@@ -1,7 +1,7 @@
 from pathlib import Path
 
 import pytest
-from myts.cli import main
+from mytsold.cli import main
 
 
 def test_success(tmp_path: Path, capsys):
