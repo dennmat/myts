@@ -2,37 +2,11 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Literal
 
-from mypy.nodes import Var
-from mypy.types import Type
-
 
 class ExportType(Enum):
 	AUTO = "auto"
 	FORCE_EXPORT = "force_export"
 	EXCLUDE = "exclude"
-
-
-class SymbolKind(Enum):
-	CLASS = "class"
-	ENUM = "enum"
-	TYPE_ALIAS = "type_alias"
-	TYPED_DICT = "typed_dict"
-
-
-@dataclass
-class SymbolEntry:
-	fullname: str
-	kind: SymbolKind
-	export: ExportType
-
-
-@dataclass
-class FieldSource:
-	fullname: str
-	name: str
-	annotation: Type | None
-	resolved: Type | None
-	var: Var
 
 
 @dataclass
@@ -140,6 +114,7 @@ class ClassDef(TypeDef):
 	fields: list[Field]
 	bases: list[str]
 	type_params: list[TypeParam]
+	from_typeddict: bool
 
 	def __repr__(self) -> str:
 		base = super().__repr__()

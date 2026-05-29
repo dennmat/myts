@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 import enum
+from enum import Flag, auto
 from typing import Generic, Literal, TypeVar
 
 from myts.core.decorators import myts_export
@@ -16,11 +17,18 @@ class NotADataclass[X, Y](MytsType):
 T = TypeVar("T", str, int)
 
 
+class EnumFlag(Flag):
+	FLAG1 = auto()
+	FLAG2 = auto()
+	FLAG3 = auto()
+
+
 @dataclass
 class GenericData(Generic[T], MytsType):
 	content: NotADataclass[T, str]
 	label: str
 	test: int
+	flag: EnumFlag
 
 
 @dataclass

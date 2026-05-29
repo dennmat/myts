@@ -1,5 +1,5 @@
 // AUTO-GENERATED FILE BY MYTS - DO NOT EDIT
-// LAST GENERATED: 2026-05-26T21:58:10.680891
+// LAST GENERATED: 2026-05-28T22:00:58.405681
 declare type OtherUnion = 4 | 3;
 
 declare type MyUnion = "cat" | 5 | OtherUnion | null;

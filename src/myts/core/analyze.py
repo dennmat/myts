@@ -5,20 +5,17 @@ import sys
 from typing import Callable
 
 from mypy import build
-from mypy.build import State
+from mypy.build import BuildResult, State
 from mypy.find_sources import create_source_list
 from mypy.modulefinder import BuildSource
 from mypy.nodes import (
 	AssignmentStmt,
 	CallExpr,
-	ClassDef,
 	Expression,
 	IntExpr,
 	MemberExpr,
-	MypyFile,
 	NameExpr,
 	StrExpr,
-	TypeAliasStmt,
 	TypeInfo,
 	Var,
 	TypeAlias,
@@ -39,7 +36,6 @@ from mypy.types import (
 
 from myts.config import MytsConfiguration
 from myts.core.ast import ASTContext
-from myts.core.build import BuildContext
 from myts.core.ir import (
 	AliasDef,
 	AliasRef,
@@ -48,15 +44,12 @@ from myts.core.ir import (
 	EnumValue,
 	ExportType,
 	Field,
-	FieldSource,
 	GenericRef,
 	ListType,
 	LiteralValue,
 	Module,
 	PrimitiveType,
 	RefType,
-	SymbolEntry,
-	SymbolKind,
 	TypeDef,
 	TypeExpr,
 	TypeParam,
@@ -66,7 +59,7 @@ from myts.core.ir import (
 	UnionTypeExpr,
 )
 from myts.core.types import AnalysisResult
-from myts.utils.mypy import is_enum, is_subclass_of, is_typeddict
+from myts.utils.mypy import is_enum, is_subclass_of, is_typeddict, split_nullable
 
 
 def topological_sort(types: dict[str, TypeDef]) -> list[TypeDef]:
@@ -176,16 +169,14 @@ def collect_refs(type_expr: TypeExpr) -> set[str]:
 
 
 class Analyzer:
-	build: BuildContext
+	build: BuildResult
 	ast: ASTContext
 
 	config: MytsConfiguration
 	root_module: str
 
-	parsed_file_cache: dict[int, MypyFile]
-
 	# Pass 1 fills this `analyze_symbols`
-	symbol_registry: dict[str, SymbolEntry]
+	aliasdef_registry: dict[str, AliasDef]
 
 	# Pass 2 fills these `extract_ir`
 	roots: set[str]
@@ -194,9 +185,9 @@ class Analyzer:
 	modules: dict[str, Module]
 
 	def __init__(
-		self, build_ctx: BuildContext, ast_ctx: ASTContext, config: MytsConfiguration
+		self, build_result: BuildResult, ast_ctx: ASTContext, config: MytsConfiguration
 	):
-		self.build = build_ctx
+		self.build = build_result
 		self.ast = ast_ctx
 		self.config = config
 		self.root_module = (
@@ -205,13 +196,12 @@ class Analyzer:
 
 		self.parsed_file_cache = {}
 
-		self.symbol_registry = {}
+		self.aliasdef_registry = {}
 		self.roots = set()
 		self.typedef_registry = {}
 		self.modules = {}
 
 	def analyze(self) -> AnalysisResult:
-		self.analyze_symbols()
 		self.extract_ir()
 		self.distill_modules()
 
@@ -220,53 +210,11 @@ class Analyzer:
 			registry=copy.deepcopy(self.typedef_registry),
 		)
 
-	def analyze_symbols(self):
-		for source in self.ast.sources:
-			tree = self.get_ast_tree_for_source(source)
-
-			for node in tree.defs:
-				if isinstance(node, ClassDef):
-					fullname = f"{source.module}.{node.name}"
-					info = self.build.get_typeinfo(fullname)
-					export = self.parse_myts_export(info)
-
-					if export is None:
-						export = ExportType.AUTO
-
-					kind: SymbolKind
-					if is_enum(info):
-						kind = SymbolKind.ENUM
-					elif is_typeddict(info):
-						kind = SymbolKind.TYPED_DICT
-					else:
-						kind = SymbolKind.CLASS
-
-					self.symbol_registry[fullname] = SymbolEntry(
-						fullname=fullname, kind=kind, export=export
-					)
-
-				elif isinstance(node, TypeAliasStmt):
-					semantic_tree = self.build.result.graph[source.module].tree
-
-					sym = semantic_tree.names.get(node.name.name)
-					if not sym:
-						return None
-
-					if not isinstance(sym.node, TypeAlias):
-						return None
-
-					alias = sym.node
-					self.symbol_registry[alias.fullname] = SymbolEntry(
-						fullname=alias.fullname,
-						kind=SymbolKind.TYPE_ALIAS,
-						export=ExportType.AUTO,
-					)
-
 	def extract_ir(self):
 		roots: list[str] = []
 		registry: dict[str, TypeDef] = {}
 
-		for state in self.build.result.graph.values():
+		for state in self.build.graph.values():
 			tree = getattr(state, "tree", None)
 			if tree is None:
 				continue
@@ -306,15 +254,6 @@ class Analyzer:
 
 		self.modules = modules
 
-	def get_ast_tree_for_source(self, source: BuildSource) -> MypyFile:
-		source_id = id(source)
-
-		if source_id in self.parsed_file_cache:
-			return self.parsed_file_cache[source_id]
-
-		self.parsed_file_cache[source_id] = self.ast.parse(source)
-		return self.parsed_file_cache[source_id]
-
 	def analyze_state(self, state: State) -> tuple[list[TypeDef], list[TypeDef]]:
 		tree = state.tree
 		results: list[TypeDef] = []
@@ -349,7 +288,7 @@ class Analyzer:
 					type_params=self.extract_alias_type_params(node),
 				)
 
-				self.symbol_registry[node.fullname] = alias_def
+				self.aliasdef_registry[node.fullname] = alias_def
 				results.append(alias_def)
 
 		return results, roots
@@ -503,7 +442,7 @@ class Analyzer:
 
 		values: list[EnumValue] = []
 
-		for name in info.names.keys():
+		for name, t in info.names.items():
 			stmt = self.ast.cache.get((fullname, name))
 
 			if not isinstance(stmt, AssignmentStmt):
@@ -537,29 +476,6 @@ class Analyzer:
 			values=values,
 		)
 
-	def collect_fields(self, info: TypeInfo) -> list[FieldSource]:
-		fields = []
-
-		for name, sym in info.names.items():
-			if not isinstance(sym.node, Var):
-				continue
-
-			var = sym.node
-
-			ast_match = self.ast.cache.get((info.fullname, var.name))
-
-			fields.append(
-				FieldSource(
-					fullname=info.fullname,
-					name=var.name,
-					annotation=ast_match.type if ast_match else None,
-					resolved=var.type,
-					var=var,
-				)
-			)
-
-		return fields
-
 	def extract_class(self, fullname: str, info: TypeInfo) -> MytsClassDef:
 		export = self.parse_myts_export(info)
 		is_myts_subclass = is_subclass_of(info, "myts.core.types.MytsType")
@@ -579,27 +495,25 @@ class Analyzer:
 		fields = []
 		deps: set[str] = set()
 
-		collected_fields = self.collect_fields(info)
-
-		for field in collected_fields:
-			if field.name.startswith("_"):
+		for name, sym in info.names.items():
+			if not isinstance(sym.node, Var):
 				continue
 
-			snode = field.var
+			node = sym.node
 
-			if snode.type is None:
+			if name.startswith("_"):  # Make as option
 				continue
 
-			# proper_type = get_proper_type(snode.type)
+			if node.type is None:
+				continue
+
+			mapped_t = self.map_type(node.type)
 
 			nullable = False
-			# if isinstance(proper_type, UnionTypeExpr):
-			# proper_type, nullable = split_nullable(proper_type)
+			if isinstance(mapped_t, UnionTypeExpr):
+				mapped_t, nullable = split_nullable(mapped_t)
 
-			mapped_t = self.map_type(snode.type)
-
-			# mapped_t = self.map_annotation(field.annotation, proper_type)
-			fields.append(Field(field.name, mapped_t, nullable))
+			fields.append(Field(node.name, mapped_t, nullable))
 			deps |= collect_refs(mapped_t)
 
 		return MytsClassDef(
@@ -611,6 +525,7 @@ class Analyzer:
 			deps=deps,
 			type_params=self.extract_type_params(info),
 			is_entrypoint=is_myts_subclass,
+			from_typeddict=False,
 		)
 
 	def extract_typeddict(self, fullname: str, info: TypeInfo) -> TypedDictDef:
@@ -638,15 +553,13 @@ class Analyzer:
 			if name.startswith("_"):
 				continue
 
-			"""t = get_proper_type(sym)
+			mapped_t = self.map_type(sym)
 
 			nullable = False
-			if isinstance(t, UnionTypeExpr):
-				t, nullable = split_nullable(t)
-			"""
+			if isinstance(mapped_t, UnionTypeExpr):
+				mapped_t, nullable = split_nullable(mapped_t)
 
-			mapped_t = self.map_type(sym)
-			fields.append(Field(name, mapped_t, False))
+			fields.append(Field(name, mapped_t, nullable))
 			deps |= collect_refs(mapped_t)
 
 		return MytsClassDef(
@@ -658,6 +571,7 @@ class Analyzer:
 			deps=deps,
 			is_entrypoint=is_myts_subclass,
 			type_params=self.extract_type_params(info),
+			from_typeddict=True,
 		)
 
 	def extract(self, fullname: str, info: TypeInfo) -> TypeDef:
@@ -672,8 +586,8 @@ class Analyzer:
 	def map_type(self, info: Type) -> TypeExpr:
 		if isinstance(info, TypeAliasType):
 			fullname = info.alias.fullname
-			if fullname in self.symbol_registry and isinstance(
-				self.symbol_registry[fullname], AliasDef
+			if fullname in self.aliasdef_registry and isinstance(
+				self.aliasdef_registry[fullname], AliasDef
 			):
 				if len(info.args) > 0:
 					args = [self.map_type(i) for i in info.args]
@@ -807,9 +721,8 @@ def create_analyzer(config: MytsConfiguration) -> Analyzer:
 		# TODO Print nicelier
 		print(build_result.errors)
 
-	build_ctx = BuildContext(build_result)
 	ast_ctx = ASTContext(sources, options)
 
-	analyzer = Analyzer(build_ctx, ast_ctx, config)
+	analyzer = Analyzer(build_result, ast_ctx, config)
 
 	return analyzer

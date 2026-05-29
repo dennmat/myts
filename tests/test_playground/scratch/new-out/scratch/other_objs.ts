@@ -1,5 +1,5 @@
 // AUTO-GENERATED FILE BY MYTS - DO NOT EDIT
-// LAST GENERATED: 2026-05-26T21:58:10.680891
+// LAST GENERATED: 2026-05-28T22:00:58.405681
 import type { AuthorTD, BookTD } from "./shared_types";
 
 export interface NotADataclass<X, Y> {
@@ -8,10 +8,18 @@ export interface NotADataclass<X, Y> {
 	z: X | Y | null;
 }
 
+export const EnumFlag = {
+	FLAG1: "FLAG1",
+	FLAG2: "FLAG2",
+	FLAG3: "FLAG3",
+} as const;
+export type EnumFlag = typeof EnumFlag[keyof typeof EnumFlag];
+
 export interface GenericData<T extends string | number> {
 	content: NotADataclass<T, string>;
 	label: string;
 	test: number;
+	flag: EnumFlag;
 }
 
 export interface MyOtherFakeClass {
@@ -26,7 +34,7 @@ export interface MyFakeBookShelf {
 	book: BookTD;
 	author: AuthorTD;
 	wow: "INT_TWO" | "wow";
-	numBooks: number | null;
+	numBooks: number;
 	cat: string | boolean | number;
 	dog: number;
 	someLits: "Hi" | "bye" | "no \"not\" no" | null | true | 34 | -32 | number;
