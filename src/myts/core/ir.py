@@ -9,45 +9,45 @@ class ExportType(Enum):
 	EXCLUDE = "exclude"
 
 
-@dataclass
+@dataclass(slots=True)
 class PrimitiveType:
 	name: Literal["str", "int", "bool", "float", "none", "any"]
 
 
-@dataclass
+@dataclass(slots=True)
 class ListType:
 	item: "TypeExpr"
 
 
-@dataclass
+@dataclass(slots=True)
 class DictType:
 	key: "TypeExpr"
 	value: "TypeExpr"
 
 
-@dataclass
+@dataclass(slots=True)
 class TupleType:
 	items: list["TypeExpr"]
 	unbounded: bool
 
 
-@dataclass
+@dataclass(slots=True)
 class UnionTypeExpr:
 	options: list["TypeExpr"]
 
 
-@dataclass
+@dataclass(slots=True)
 class RefType:
 	name: str
 	fullname: str
 
 
-@dataclass
+@dataclass(slots=True)
 class TypeVar:
 	name: str
 
 
-@dataclass
+@dataclass(slots=True)
 class LiteralValue:
 	value: str | int | bool | bytes | None
 
@@ -55,21 +55,21 @@ class LiteralValue:
 TypeExpr = PrimitiveType | ListType | DictType | UnionTypeExpr | RefType | TypeVar
 
 
-@dataclass
+@dataclass(slots=True)
 class GenericRef:
 	fullname: str
 	short_name: str
 	args: list[TypeExpr]
 
 
-@dataclass
+@dataclass(slots=True)
 class AliasRef:
 	fullname: str
 	short_name: str
 	args: list[TypeExpr]
 
 
-@dataclass
+@dataclass(slots=True)
 class Field:
 	name: str
 	type: TypeExpr
@@ -79,14 +79,14 @@ class Field:
 		return f"{self.name} -> {self.type}"
 
 
-@dataclass
+@dataclass(slots=True)
 class TypeParam:
 	name: str
 	bound: TypeExpr | None
 	constraints: list[TypeExpr] | None
 
 
-@dataclass
+@dataclass(slots=True)
 class TypeDef:
 	fullname: str
 	name: str
@@ -103,13 +103,13 @@ class TypeDef:
 		return f"{self.fullname} ({self.__class__.__name__})"
 
 
-@dataclass
+@dataclass(slots=True)
 class AliasDef(TypeDef):
 	target: "TypeExpr"
 	type_params: list[TypeParam]
 
 
-@dataclass
+@dataclass(slots=True)
 class ClassDef(TypeDef):
 	fields: list[Field]
 	bases: list[str]
@@ -124,25 +124,25 @@ class ClassDef(TypeDef):
 		return f"{base}\n{fields}"
 
 
-@dataclass
+@dataclass(slots=True)
 class EnumValue:
 	name: str
 	value: str | int
 
 
-@dataclass
+@dataclass(slots=True)
 class EnumDef(TypeDef):
 	values: list[EnumValue]
 
 
-@dataclass
+@dataclass(slots=True)
 class TypedDictDef(TypeDef):
 	fields: list[Field]
 	bases: list[str]
 	type_params: list[TypeParam]
 
 
-@dataclass
+@dataclass(slots=True)
 class Module:
 	fullname: str
 	registry: dict[str, TypeDef]
