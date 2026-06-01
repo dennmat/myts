@@ -268,7 +268,7 @@ class TSExporter(Exporter):
 
 		lines_out: list[str] = []
 		lines_out.append(
-			f"declare type {type_def.name}{params} = {self.emit_type(type_def.target)};"
+			f"export declare type {type_def.name}{params} = {self.emit_type(type_def.target)};"
 		)
 
 		return lines_out

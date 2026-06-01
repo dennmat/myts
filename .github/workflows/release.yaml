@@ -50,7 +50,7 @@ jobs:
         run: uv sync --locked --all-extras --dev
 
       - name: Run tests
-        run: uv run tox -p auto
+        run: uv run tox
     
       - name: Build package
         run: uv build
