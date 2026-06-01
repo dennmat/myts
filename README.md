@@ -5,7 +5,11 @@
 ![GitHub License](https://img.shields.io/github/license/dennmat/myts)
 ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/dennmat/myts/release.yaml)
 
-## Alpha - this is not production ready
+## In beta - this is not production ready
+
+Road to ready:
+- [ ] Better test coverage, 80% baseline
+- [x] Support for generics, enums with auto, most MyPy typing.
 
 Converts MyPy types to TS types. Uses MyPy's internal api to gather type info.
 
@@ -160,6 +164,19 @@ Python (Mypy)
 
 ```python
 from myts import MytsType, myts_export
+from pytdantic import BaseModel
+
+
+class APIModel(BaseModel, MytsType):
+	"""
+		All pydantic models that extend from this will be picked up by Myts
+	"""
+	...
+
+
+class MyPydanticModel(APIModel): # Myts will grab this
+	name: str
+
 
 @myts_export # Flags for export even though it is never referenced
 class MyNotReferencedEnum(StrEnum):
@@ -186,9 +203,10 @@ class OtherThing(MytsType):
 	info: MyTypedDict
 ```
 
-Output (Typescript)
+Output (Typescript) (Out of date)
 
 ```typescript
+
 export enum MyNotReferencedEnum {
 	A = "🍁",
 	B = "🐝",
