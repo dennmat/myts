@@ -1,5 +1,5 @@
 // AUTO-GENERATED FILE BY MYTS - DO NOT EDIT
-// LAST GENERATED: 2026-05-30T09:45:09.970815
+// LAST GENERATED: 2026-05-31T21:29:46.874301
 import type { AuthorTD, BookTD } from "./shared_types";
 
 export interface NotADataclass<X, Y> {
@@ -9,9 +9,9 @@ export interface NotADataclass<X, Y> {
 }
 
 export const EnumFlag = {
-	FLAG1: "FLAG1",
-	FLAG2: "FLAG2",
-	FLAG3: "FLAG3",
+	FLAG1: 1,
+	FLAG2: 2,
+	FLAG3: 3,
 } as const;
 export type EnumFlag = typeof EnumFlag[keyof typeof EnumFlag];
 

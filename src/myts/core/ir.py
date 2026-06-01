@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from enum import Enum
+from enum import Enum, auto
 from typing import Literal
 
 
@@ -124,10 +124,14 @@ class ClassDef(TypeDef):
 		return f"{base}\n{fields}"
 
 
+class EnumSpecialValue(Enum):
+	AUTO = auto()
+
+
 @dataclass(slots=True)
 class EnumValue:
 	name: str
-	value: str | int
+	value: str | int | None
 
 
 @dataclass(slots=True)

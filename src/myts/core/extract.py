@@ -6,6 +6,7 @@ from mypy.nodes import (
 	IntExpr,
 	MemberExpr,
 	NameExpr,
+	OpExpr,
 	StrExpr,
 	TypeAlias,
 	TypeInfo,
@@ -30,6 +31,7 @@ from myts.core.ir import (
 	AliasRef,
 	DictType,
 	EnumDef,
+	EnumSpecialValue,
 	EnumValue,
 	ExportType,
 	Field,
@@ -251,11 +253,16 @@ def extract_types_from_state(
 	return results, roots
 
 
-def extract_enum_value(sym: Var, stmt: AssignmentStmt) -> int | str | None:
+def extract_enum_value(
+	sym: Var, stmt: AssignmentStmt
+) -> int | str | None | EnumSpecialValue:
 	# 1. Preferred: mypy resolved value
 	final_value = getattr(sym, "final_value", None)
 	if isinstance(final_value, (int, str)):
 		return final_value
+
+	if sym.type and isinstance(sym.type, LiteralType):
+		return sym.type.value
 
 	# 2. Fallback: inspect RHS AST
 	rvalue: Expression = stmt.rvalue
@@ -276,6 +283,8 @@ def extract_enum_value(sym: Var, stmt: AssignmentStmt) -> int | str | None:
 			ref_val = getattr(node, "final_value", None)
 			if isinstance(ref_val, (int, str)):
 				return ref_val
+		elif rvalue.name == "None":
+			return None
 
 	# 4. Member access (rare but possible)
 	if isinstance(rvalue, MemberExpr):
@@ -285,18 +294,24 @@ def extract_enum_value(sym: Var, stmt: AssignmentStmt) -> int | str | None:
 			if isinstance(ref_val, (int, str)):
 				return ref_val
 
-	# 5. auto() or function calls → unresolved
+	# 5. OpExpr (Arithmetic) A = 1 + 5
+	if isinstance(rvalue, OpExpr):
+		...  # TODO recurse and resolve OpExpr(left=IntExpr|FloatExpr|Member, right=SameAsLeft, op="+")
+
+	# 6. auto() or function calls → unresolved
+	# - may remove this, might be cleaner to just not support
 	if isinstance(rvalue, CallExpr):
+		if sym.type.type.fullname == "enum.auto":
+			return EnumSpecialValue.AUTO
+
 		return None
 
 	return None
 
 
 def extract_enum(
-	root_module: str,
 	fullname: str,
 	info: TypeInfo,
-	aliasdef_registry: dict[str, AliasDef],
 	ast: ASTContext,
 ) -> EnumDef:
 	export = parse_myts_export(info)
@@ -306,10 +321,9 @@ def extract_enum(
 
 	values: list[EnumValue] = []
 
-	for name, t in info.names.items():
-		stmt = ast.cache.get(
-			(fullname, name)
-		)  # FIND A WAY AROUND THIS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! defn?
+	collected_values: list[tuple[str, str | int | None | EnumSpecialValue]] = []
+	for name in info.names.keys():
+		stmt = ast.cache.get((fullname, name))
 
 		if not isinstance(stmt, AssignmentStmt):
 			continue
@@ -331,7 +345,18 @@ def extract_enum(
 		if not isinstance(sym.node, Var):
 			continue
 
-		values.append(EnumValue(name, extract_enum_value(sym.node, stmt)))
+		collected_values.append((name, extract_enum_value(sym.node, stmt)))
+
+	# Resolve AUTO's matching Python's defaults as closely as possible
+	next_value = 1
+	for name, value in collected_values:
+		if value == EnumSpecialValue.AUTO:
+			value = next_value
+
+		values.append(EnumValue(name, value))
+
+		if isinstance(value, int):
+			next_value = value + 1
 
 	return EnumDef(
 		name=info.name,
@@ -461,7 +486,7 @@ def extract(
 	ast: ASTContext,
 ) -> TypeDef:
 	if is_enum(info):
-		return extract_enum(root_module, fullname, info, aliasdef_registry, ast)
+		return extract_enum(fullname, info, ast)
 
 	if is_typeddict(info):
 		return extract_typeddict(root_module, fullname, info, aliasdef_registry)

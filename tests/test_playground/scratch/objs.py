@@ -8,7 +8,9 @@ from myts.core.types import MytsType
 class SomeEnum(enum.IntEnum):
 	ENUM1 = 1
 	ENUM2 = 3
+	ENUMB = enum.auto()
 	ENUM3 = 5
+	ENUMA = enum.auto()
 
 
 type OtherUnion = Literal[4] | Literal[3]

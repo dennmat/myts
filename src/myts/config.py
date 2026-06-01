@@ -1,6 +1,7 @@
 from pathlib import Path
 import sys
 import tomllib
+from typing import Any
 
 from pydantic import BaseModel, ValidationError
 
@@ -25,6 +26,7 @@ class MytsConfiguration(BaseModel):
 	dry_run: bool
 	output_file_name: str | None = None
 	trim_root: str | None = None
+	exporter: dict[str, Any]
 
 
 class MytsConfigurationInput(BaseModel):
@@ -35,6 +37,7 @@ class MytsConfigurationInput(BaseModel):
 	dry_run: bool | None = None
 	output_file_name: str | None = None
 	trim_root: str | None = None
+	exporter: dict[str, Any] | None = None
 
 
 def default_and_merge_myts_configs(
@@ -50,6 +53,7 @@ def default_and_merge_myts_configs(
 		group="module",
 		preserve_structure=True,
 		dry_run=False,
+		exporter=dict(),
 	)
 
 	merged = {}
