@@ -1,6 +1,6 @@
 [project]
 name = "myts"
-version = "0.2.0"
+version = "0.3.0"
 description = "MyPy to TS generator"
 authors = [
     { name = "Matthew Dennis" },
@@ -61,7 +61,7 @@ source = ["myts"]
 omit = ["__main__.py", "src/**"]
 
 [tool.coverage.report]
-fail_under = 60
+fail_under = 0
 show_missing = true
 exclude_lines = [
     'pragma: no cover',

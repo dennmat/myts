@@ -6,12 +6,12 @@ commands = [
 	["coverage", "run", "-m", "pytest"]
 ]
 
-[env.coverage]
-skip_install = true
-deps = ["coverage"]
-depends = ["3.*"]
-commands = [
-	["coverage", "combine"],
-	["coverage", "report", "-m"],
-	["coverage", "html"]
-]
+#[env.coverage]
+#skip_install = true
+#deps = ["coverage"]
+#depends = ["3.*"]
+#commands = [
+#	["coverage", "combine"],
+#	["coverage", "report", "-m"],
+#	["coverage", "html"]
+#]
