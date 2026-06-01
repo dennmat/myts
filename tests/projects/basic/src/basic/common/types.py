@@ -1,5 +1,4 @@
-from mytsold.decorators import myts_export
-from mytsold.types import MytsType
+from myts import myts_export, MytsType
 
 
 class NotIncluded: ...

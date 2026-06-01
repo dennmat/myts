@@ -1,5 +1,5 @@
 // AUTO-GENERATED FILE BY MYTS - DO NOT EDIT
-// LAST GENERATED: 2026-04-30T10:09:47.429304
+// LAST GENERATED: 2026-05-31T21:59:07.932062
 export interface User {
 	firstName: string;
 	lastName: string;

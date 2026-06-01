@@ -117,7 +117,7 @@ class ClassDef(TypeDef):
 	from_typeddict: bool
 
 	def __repr__(self) -> str:
-		base = super().__repr__()
+		base = super(ClassDef, self).__repr__()
 
 		fields = "\n".join([f"\t{f.__repr__()}" for f in self.fields])
 
