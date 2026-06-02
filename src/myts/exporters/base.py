@@ -1,7 +1,6 @@
 from abc import ABC
 from dataclasses import dataclass
 
-from myts.config import MytsConfiguration
 from myts.core.types import AnalysisResult
 
 
@@ -11,10 +10,8 @@ class BaseTypeDef:
 
 
 class Exporter(ABC):
-	def transform(
-		self, analysis: AnalysisResult, config: MytsConfiguration
-	) -> list[BaseTypeDef]:
+	def transform(self, analysis: AnalysisResult) -> list[BaseTypeDef]:
 		raise NotImplementedError
 
-	def emit(self, ir: list[BaseTypeDef], config: MytsConfiguration):
+	def emit(self, ir: list[BaseTypeDef]):
 		raise NotImplementedError

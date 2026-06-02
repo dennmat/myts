@@ -8,16 +8,6 @@ from pydantic import BaseModel, ValidationError
 from myts.core.types import GroupingMode
 
 
-class MytsUnsetType:
-	__slots__ = ()
-
-	def __repr__(self) -> str:
-		return "Unset"
-
-
-MytsUnset = MytsUnsetType()
-
-
 class MytsConfiguration(BaseModel):
 	root: Path
 	output: Path

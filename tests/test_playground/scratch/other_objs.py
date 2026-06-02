@@ -5,10 +5,10 @@ from typing import Generic, Literal, TypeVar
 
 from myts.core.decorators import myts_export
 from .shared_types import AuthorTD, BookTD, FakeIntEnum
-from myts.core.types import MytsType
+from myts.core.types import MytsType as AliasedMyts
 
 
-class NotADataclass[X, Y](MytsType):
+class NotADataclass[X, Y](AliasedMyts):
 	x: X
 	y: X | Y
 	z: X | Y | None
@@ -24,7 +24,7 @@ class EnumFlag(Flag):
 
 
 @dataclass
-class GenericData(Generic[T], MytsType):
+class GenericData(Generic[T], AliasedMyts):
 	content: NotADataclass[T, str]
 	label: str
 	test: int
@@ -32,7 +32,7 @@ class GenericData(Generic[T], MytsType):
 
 
 @dataclass
-class MyOtherFakeClass(MytsType):
+class MyOtherFakeClass(AliasedMyts):
 	bleh: str
 	this: list[int]
 	that: list[dict[str, int]]
@@ -40,7 +40,7 @@ class MyOtherFakeClass(MytsType):
 
 
 @dataclass
-class MyFakeBookShelf(MytsType):
+class MyFakeBookShelf(AliasedMyts):
 	books: list[BookTD]
 	book: BookTD
 	author: AuthorTD

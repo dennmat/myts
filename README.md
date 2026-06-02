@@ -5,13 +5,14 @@
 ![GitHub License](https://img.shields.io/github/license/dennmat/myts)
 ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/dennmat/myts/release.yaml)
 
-## In beta - this is not production ready
+## In beta
 
 Road to ready:
 - [ ] Better test coverage, 80% baseline
 - [x] Support for generics, enums with auto, most MyPy typing.
 
 Converts MyPy types to TS types. Uses MyPy's internal api to gather type info.
+Including your pydantic project if its MyPy friendly.
 
 Call as a cli, optionally directory watchable.
 Or import and invoke directly from your Python code.
@@ -25,12 +26,12 @@ pip install myts
 
 **uv**
 ```sh
-uv add --dev myts
+uv add myts 
 ```
 
 **poetry**
 ```sh
-poetry add myts --group dev
+poetry add myts
 ```
 
 
@@ -42,8 +43,6 @@ Myts looks for any classes that inherit from `MytsType` to start building its de
 These by default will be included in the output TS.
 
 Alternatively you can use the `myts_export` decorator on `Enum`s and `TypedDict`s and `class`es that you would like to have exported without needing to be referenced by a `MytsType` class.
-
-**Note**: Right now you cannot alias either of these, in a future version that will be okay.
 
 ```python
 from enum import IntEnum
@@ -133,6 +132,7 @@ myts --output your/output/dir/ -w
 ```python
 import pathlib
 import myts
+from myts.cli.main import extract_ts
 
 config = myts.MytsConfiguration(
 	root=pathlib.Path('someprojdir'), # defaults to os.cwd()
@@ -144,7 +144,7 @@ config = myts.MytsConfiguration(
 	trim_root="myapp.some.path" # When preserving structure, use this to trim a common root 
 )
 
-myts.extract_ts(config)
+extract_ts(config)
 ```
 
 ## Roadmap
@@ -152,19 +152,30 @@ myts.extract_ts(config)
 - [x] Export to multiple files, flat folder or matching py module structure
 - [x] Support generics
 - [x] Watch for `py` changes and auto generate `ts`
-- [ ] Config options for 
-  - [ ] [Py api] override output names of vars and files
+- [ ] Config options for
   - [ ] Variable and type naming options (camelCase, PascalCase, snake_case)
-  - [ ] Interface vs type output
-- [ ] `myts_export` params to override naming and module grouping
-- [ ] Name overwriting using meta class on `MytsType` or params to `myts_export`
+  - [x] Interface vs type output
+- [ ] Special support for pydantics built-ins (might build a plugin architecture to support)
+
+## Exporter configuration
+Currently, myts only has 1 built-in exporter for ts. However it has been designed to easily support multiple exporters in the future, including the potential for custom exporters(actually achievable today, just without a "formal" plugin architecture).
+
+The TS exporter can be configured by adding a [exporter.ts] section to your myts config:
+```toml
+[exporter.ts]
+enum_output_format = "typed_const_map" # or "std_enum" to use TS enums. Default is typed_const_map for DX
+typeddict_output_format = "interface" # or "type". Default interface to support inheritance
+class_output_format = "interface" # or "type". Default interface to support inheritance
+use_declare = true # default true, for any `type` declarations will precede with 'declare' if true
+indent = "tabs" # default tabs, because they're superior, "spaces" is an option, currently the number of spaces is 4 and not yet configurable
+```
 
 ## Example of functionality
 Python (Mypy)
 
 ```python
 from myts import MytsType, myts_export
-from pytdantic import BaseModel
+from pydantic import BaseModel
 
 
 class APIModel(BaseModel, MytsType):
@@ -178,59 +189,32 @@ class MyPydanticModel(APIModel): # Myts will grab this
 	name: str
 
 
-@myts_export # Flags for export even though it is never referenced
-class MyNotReferencedEnum(StrEnum):
-	A = "🍁"
-	B = "🐝"
-	C = "👀"
+class Fruits(Enum):
+	APPLE = auto()
+	BANANA = auto()
+	GRAPES = auto()
 
-class SomeEnum(IntEnum): # Automatically exported due to being reference by OtherThing
-	A = 5
-	B = 6
-	C = 12
-
-class MyTypedDict[T: "Example"](TypedDict): # Generics supported
-	a: NotRequired[T]
-	b: Literal["one", "two", "three"]
-
-class Example(MytsType): # Inherits MytsType -- will be exported
-	something: str
-	other_thing: "OtherThing"
-
-@dataclass
-class OtherThing(MytsType):
-	thing: SomeEnum
-	info: MyTypedDict
+class MyGenericClass[T: str | int]:
+	my_var: T
+	fruits: list[Fruits]
 ```
 
-Output (Typescript) (Out of date)
+Output (Typescript)
 
 ```typescript
-
-export enum MyNotReferencedEnum {
-	A = "🍁",
-	B = "🐝",
-	C = "👀",
+export interface MyPedanticModel {
+	name: string;
 }
 
-export enum SomeEnum {
-	A = 5,
-	B = 6,
-	C = 12,
+export const Fruits = {
+	APPLE: 1,
+	BANANA: 2,
+	GRAPES: 3,
+} as const;
+export type Fruits = typeof Fruits[keyof typeof Fruits];
+
+export interface MyGenericClass<T extends string | number> {
+	myVar: T;
+	fruits: Array<Fruits>;
 }
-
-export type MyTypedDict<T extends Example> = {
-	a?: T;
-	b: "one" | "two" | "three";
-};
-
-export type Example = {
-	something: string;
-	otherThing: OtherThing;
-};
-
-export type OtherThing = {
-	thing: SomeEnum;
-	info: MyTypedDict;
-};
 ```

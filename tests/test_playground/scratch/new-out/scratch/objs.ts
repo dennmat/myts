@@ -1,8 +1,8 @@
 // AUTO-GENERATED FILE BY MYTS - DO NOT EDIT
-// LAST GENERATED: 2026-05-31T21:29:46.874301
-declare type OtherUnion = 4 | 3;
+// LAST GENERATED: 2026-06-01T22:26:21.914547
+export declare type OtherUnion = 4 | 3;
 
-declare type MyUnion = "cat" | 5 | OtherUnion | null;
+export declare type MyUnion = "cat" | 5 | OtherUnion | null;
 
 export interface TestClassSimple {
 	wow: string;
@@ -24,7 +24,7 @@ export interface WoahAnother {
 	neaterIno: SomeEnum;
 }
 
-declare type MyGenericAlias<T> = Array<T> | Record<string, T>;
+export declare type MyGenericAlias<T> = Array<T> | Record<string, T>;
 
 export interface UseMyGeneric<X> {
 	stillGeneric: MyGenericAlias<X>;

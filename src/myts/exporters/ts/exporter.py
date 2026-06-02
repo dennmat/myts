@@ -28,6 +28,7 @@ from myts.core.ir import (
 )
 from myts.core.types import AnalysisResult, GroupingMode
 from myts.exporters.base import Exporter
+from myts.exporters.ts.config import TSExportConfig, default_and_merge_ts_configs
 from myts.exporters.ts.ir import (
 	TSAliasDef,
 	TSArray,
@@ -153,9 +154,15 @@ def get_output_file_path(
 
 
 class TSExporter(Exporter):
-	def transform(
-		self, analysis: AnalysisResult, config: MytsConfiguration
-	) -> list[TSModule]:
+	myts_config: MytsConfiguration
+	config: TSExportConfig
+
+	def __init__(self, config: MytsConfiguration):
+		ts_config = default_and_merge_ts_configs(config)
+		self.config = ts_config
+		self.myts_config = config
+
+	def transform(self, analysis: AnalysisResult) -> list[TSModule]:
 		ts_modules: list[TSModule] = []
 
 		collect_fields = build_field_collector(analysis.registry)
@@ -217,6 +224,7 @@ class TSExporter(Exporter):
 								)
 								for f in fields
 							],
+							was_typeddict=type_def.from_typeddict,
 						)
 					)
 				# elif UNION ALIAS?:
@@ -233,20 +241,16 @@ class TSExporter(Exporter):
 
 		return ts_modules
 
-	def get_outputs(
-		self, analysis: AnalysisResult, config: MytsConfiguration
-	) -> list[
-		TSOutput
-	]:  # TODO name me better, add to base? figure out wwhat i do first might need a whole rename anyways
+	def get_outputs(self, analysis: AnalysisResult) -> list[TSOutput]:
 		outputs: list[TSOutput] = []
 		for module in analysis.modules:
 			output_file_path = get_output_file_path(
 				module,
-				output_folder=config.output,
-				group=config.group,
-				output_file_name=config.output_file_name,
-				trim_root=config.trim_root,
-				preserve_structure=config.preserve_structure,
+				output_folder=self.myts_config.output,
+				group=self.myts_config.group,
+				output_file_name=self.myts_config.output_file_name,
+				trim_root=self.myts_config.trim_root,
+				preserve_structure=self.myts_config.preserve_structure,
 			)
 
 			outputs.append(
@@ -266,9 +270,11 @@ class TSExporter(Exporter):
 	def emit_alias_def(self, type_def: TSAliasDef) -> list[str]:
 		params = self.emit_type_params(type_def.generic_args)
 
+		declare_stmt = "declare " if self.config.use_declare else ""
+
 		lines_out: list[str] = []
 		lines_out.append(
-			f"export declare type {type_def.name}{params} = {self.emit_type(type_def.target)};"
+			f"export {declare_stmt}type {type_def.name}{params} = {self.emit_type(type_def.target)};"
 		)
 
 		return lines_out
@@ -276,29 +282,44 @@ class TSExporter(Exporter):
 	def emit_interface_def(self, type_def: TSInterfaceDef) -> list[str]:
 		lines_out: list[str] = []
 
+		use_interface = (
+			type_def.was_typeddict
+			and self.config.typeddict_output_format == "interface"
+			or not type_def.was_typeddict
+			and self.config.class_output_format == "interface"
+		)
+
 		params = self.emit_type_params(type_def.generic_args)
 
 		bases = self.emit_bases(type_def.bases)
 
-		# TODO make interface vs type an option
-		lines_out.append(f"export interface {type_def.name}{params}{bases} {{")
+		if use_interface:
+			lines_out.append(f"export interface {type_def.name}{params}{bases} {{")
+		else:
+			declare_stmt = "declare " if self.config.use_declare else ""
+			lines_out.append(f"export {declare_stmt}type {type_def.name}{params} = {{")
 
+		whitespace = "\t" if self.config.indent == "tabs" else "    "
 		for field in type_def.fields:
-			whitespace = "\t"  # if tabs else use invalid stupid spaces
 			lines_out.append(f"{whitespace}{field.name}: {self.emit_type(field.type)};")
 
-		lines_out.append("}")
+		if use_interface:
+			lines_out.append("}")
+		else:
+			lines_out.append("};")
 
 		return lines_out
 
 	def emit_enum_def(self, tdef: TSEnumDef) -> list[str]:
 		lines_out: list[str] = []
 
-		# TODO make interface vs type an option
-		lines_out.append(f"export const {tdef.name} = {{")
+		if self.config.enum_output_format == "typed_const_map":
+			lines_out.append(f"export const {tdef.name} = {{")
+		elif self.config.enum_output_format == "std_enum":
+			lines_out.append(f"export enum {tdef.name} {{")
 
+		whitespace = "\t" if self.config.indent == "tabs" else "    "
 		for enum_value in tdef.values:
-			whitespace = "\t"  # if tabs else use invalid stupid spaces
 			val = enum_value.value
 
 			if val is None:
@@ -308,12 +329,18 @@ class TSExporter(Exporter):
 			elif isinstance(val, str):
 				val = f'"{enum_value.value}"'
 
-			lines_out.append(f"{whitespace}{enum_value.name}: {val},")
+			if self.config.enum_output_format == "typed_const_map":
+				lines_out.append(f"{whitespace}{enum_value.name}: {val},")
+			elif self.config.enum_output_format == "std_enum":
+				lines_out.append(f"{whitespace}{enum_value.name} = {val},")
 
-		lines_out.append("} as const;")
-		lines_out.append(
-			f"export type {tdef.name} = typeof {tdef.name}[keyof typeof {tdef.name}];"
-		)
+		if self.config.enum_output_format == "typed_const_map":
+			lines_out.append("} as const;")
+			lines_out.append(
+				f"export type {tdef.name} = typeof {tdef.name}[keyof typeof {tdef.name}];"
+			)
+		elif self.config.enum_output_format == "std_enum":
+			lines_out.append("}")
 
 		return lines_out
 
@@ -499,14 +526,14 @@ class TSExporter(Exporter):
 		elif group == "single":
 			self.output_single(outputs, dry_run)
 
-	def emit(self, modules: list[TSModule], config: MytsConfiguration):
+	def emit(self, modules: list[TSModule]):
 		outputs = self.generate_outputs(
 			modules,
-			output_folder=config.output,
-			group=config.group,
-			output_file_name=config.output_file_name,
-			trim_root=config.trim_root,
-			preserve_structure=config.preserve_structure,
+			output_folder=self.myts_config.output,
+			group=self.myts_config.group,
+			output_file_name=self.myts_config.output_file_name,
+			trim_root=self.myts_config.trim_root,
+			preserve_structure=self.myts_config.preserve_structure,
 		)
 
-		self.output_writer(outputs, config.group, config.dry_run)
+		self.output_writer(outputs, self.myts_config.group, self.myts_config.dry_run)

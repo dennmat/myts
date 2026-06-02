@@ -1,5 +1,5 @@
 // AUTO-GENERATED FILE BY MYTS - DO NOT EDIT
-// LAST GENERATED: 2026-05-31T21:29:46.874301
+// LAST GENERATED: 2026-06-01T22:26:21.914547
 import type { AuthorTD, BookTD } from "./shared_types";
 
 export interface NotADataclass<X, Y> {

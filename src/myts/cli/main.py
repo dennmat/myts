@@ -158,10 +158,10 @@ def extract_ts(config: MytsConfiguration):
 
 	analysis_result = analyzer.analyze()
 
-	exporter = TSExporter()
+	exporter = TSExporter(config)
 
-	ts_ir = exporter.transform(analysis_result, config)
-	exporter.emit(ts_ir, config)
+	ts_ir = exporter.transform(analysis_result)
+	exporter.emit(ts_ir)
 
 
 if __name__ == "__main__":

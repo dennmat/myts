@@ -62,6 +62,7 @@ class TSInterfaceDef:
 	output_module: str
 	fields: list[TSField]
 	generic_args: list[TSTypeParam]
+	was_typeddict: bool
 
 
 @dataclass(slots=True)
