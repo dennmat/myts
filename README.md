@@ -5,12 +5,6 @@
 ![GitHub License](https://img.shields.io/github/license/dennmat/myts)
 ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/dennmat/myts/release.yaml)
 
-## In beta
-
-Road to ready:
-- [ ] Better test coverage, 80% baseline
-- [x] Support for generics, enums with auto, most MyPy typing.
-
 Converts MyPy types to TS types. Uses MyPy's internal api to gather type info.
 Including your pydantic project if its MyPy friendly.
 
